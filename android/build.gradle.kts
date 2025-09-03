@@ -1,6 +1,8 @@
 plugins {
+    // Android Gradle Plugin
     id("com.android.application") version "8.7.3" apply false
-    id("com.google.gms.google-services") version "4.4.2" apply false
+    // id("com.google.gms.google-services") version "4.4.2" apply false
+    // ^^^ HAPUS/FIX: jangan dipakai kalau tidak pakai Firebase
 }
 
 allprojects {
@@ -10,7 +12,7 @@ allprojects {
     }
 }
 
-// Custom build dir
+// Custom build dir biar lebih rapi
 val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
 rootProject.layout.buildDirectory.value(newBuildDir)
 
