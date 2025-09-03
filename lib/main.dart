@@ -35,45 +35,27 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<String> listings = [];
-  bool isLoading = true;
+  List<Map<String, String>> listings = [];
 
   // AdMob IDs
   final String bannerAdUnitId = "ca-app-pub-6721734106426198/5259469376";
   final String interstitialAdUnitId = "ca-app-pub-6721734106426198/7710531994";
-  final String nativeAdUnitId = "ca-app-pub-6721734106426198/6120735266";
 
   BannerAd? _bannerAdTop;
   BannerAd? _bannerAdBottom;
   InterstitialAd? _interstitialAd;
   Timer? _interstitialTimer;
 
-  // Cache Native Ads
-  final Map<int, NativeAd> _nativeAds = {};
-
   @override
   void initState() {
     super.initState();
     _fetchListings();
 
-    // Banner atas
-    _bannerAdTop = BannerAd(
-      adUnitId: bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: const BannerAdListener(),
-    )..load();
-
-    // Banner bawah
-    _bannerAdBottom = BannerAd(
-      adUnitId: bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: const BannerAdListener(),
-    )..load();
-
-    // Load interstitial
+    // Load Ads
+    _loadBannerAds();
     _loadInterstitialAd();
+
+    // Timer untuk interstitial
     _interstitialTimer = Timer(const Duration(minutes: 3), () {
       _showInterstitialAd();
     });
@@ -81,54 +63,49 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchListings() async {
     try {
-      final response =
-          await http.get(Uri.parse("https://dannycawan.github.io/site/"));
+      final response = await http.get(Uri.parse("https://dannycawan.github.io/site/"));
       if (response.statusCode == 200) {
         final document = html.parse(response.body);
-        final items = document.querySelectorAll("li");
 
-        setState(() {
-          listings = items.map((e) => e.text.trim()).toList();
-          isLoading = false;
-        });
+        // Cari semua <tr> di tabel
+        final rows = document.querySelectorAll("table tr");
+        List<Map<String, String>> data = [];
 
-        // Preload native ads untuk tiap 3 item
-        for (int i = 0; i < listings.length; i++) {
-          if (i > 0 && i % 3 == 0) {
-            _loadNativeAd(i);
+        for (var row in rows.skip(1)) {
+          final cols = row.querySelectorAll("td");
+          if (cols.length >= 4) {
+            data.add({
+              "name": cols[0].text.trim(),
+              "address": cols[1].text.trim(),
+              "phone": cols[2].text.trim(),
+              "map": cols[3].querySelector("a")?.attributes["href"] ?? "",
+            });
           }
         }
-      } else {
+
         setState(() {
-          isLoading = false;
+          listings = data;
         });
       }
     } catch (e) {
-      debugPrint("Scraping error: $e");
-      setState(() {
-        isLoading = false;
-      });
+      debugPrint("Error fetch: $e");
     }
   }
 
-  void _loadNativeAd(int index) {
-    final nativeAd = NativeAd(
-      adUnitId: nativeAdUnitId,
-      factoryId: 'listTile', // register factory di Android/iOS
+  void _loadBannerAds() {
+    _bannerAdTop = BannerAd(
+      adUnitId: bannerAdUnitId,
+      size: AdSize.banner,
       request: const AdRequest(),
-      listener: NativeAdListener(
-        onAdLoaded: (ad) {
-          setState(() {
-            _nativeAds[index] = ad as NativeAd;
-          });
-        },
-        onAdFailedToLoad: (ad, error) {
-          debugPrint("NativeAd failed: $error");
-          ad.dispose();
-        },
-      ),
-    );
-    nativeAd.load();
+      listener: const BannerAdListener(),
+    )..load();
+
+    _bannerAdBottom = BannerAd(
+      adUnitId: bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: const BannerAdListener(),
+    )..load();
   }
 
   void _loadInterstitialAd() {
@@ -136,12 +113,8 @@ class _HomePageState extends State<HomePage> {
       adUnitId: interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialAd = ad;
-        },
-        onAdFailedToLoad: (error) {
-          debugPrint("InterstitialAd failed: $error");
-        },
+        onAdLoaded: (ad) => _interstitialAd = ad,
+        onAdFailedToLoad: (error) => debugPrint("Interstitial failed: $error"),
       ),
     );
   }
@@ -160,9 +133,6 @@ class _HomePageState extends State<HomePage> {
     _bannerAdBottom?.dispose();
     _interstitialAd?.dispose();
     _interstitialTimer?.cancel();
-    for (final ad in _nativeAds.values) {
-      ad.dispose();
-    }
     super.dispose();
   }
 
@@ -184,25 +154,52 @@ class _HomePageState extends State<HomePage> {
               child: AdWidget(ad: _bannerAdTop!),
             ),
 
-          // Konten scraping + native ads
+          // Konten daftar
           Expanded(
-            child: isLoading
+            child: listings.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.builder(
                     itemCount: listings.length,
                     itemBuilder: (context, index) {
-                      if (_nativeAds.containsKey(index)) {
+                      final item = listings[index];
+                      // Selipkan Native/ Banner placeholder tiap 3 item
+                      if (index % 3 == 0 && index != 0) {
                         return Column(
                           children: [
-                            ListTile(title: Text(listings[index])),
-                            SizedBox(
-                              height: 100,
-                              child: AdWidget(ad: _nativeAds[index]!),
+                            ListTile(
+                              title: Text(item["name"] ?? ""),
+                              subtitle: Text("${item["address"]}\n${item["phone"]}"),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.map),
+                                onPressed: () {
+                                  final url = item["map"] ?? "";
+                                  if (url.isNotEmpty) {
+                                    // bisa tambahin url_launcher kalau mau buka Google Maps
+                                  }
+                                },
+                              ),
                             ),
+                            Container(
+                              alignment: Alignment.center,
+                              margin: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text("Native Ad Placeholder"), // nanti diganti NativeAdWidget
+                            )
                           ],
                         );
                       }
-                      return ListTile(title: Text(listings[index]));
+                      return ListTile(
+                        title: Text(item["name"] ?? ""),
+                        subtitle: Text("${item["address"]}\n${item["phone"]}"),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.map),
+                          onPressed: () {
+                            final url = item["map"] ?? "";
+                            if (url.isNotEmpty) {
+                              // bisa tambahin url_launcher
+                            }
+                          },
+                        ),
+                      );
                     },
                   ),
           ),
