@@ -13,34 +13,57 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout source
       - name: Checkout source
         uses: actions/checkout@v4
 
+      # 2. Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'   # Paksa pakai Flutter terbaru (Dart 3.8.x)
+          flutter-version: "3.27.0"
 
+      # 3. Cache dependencies
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      # 4. Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
+      # 5. Auto increment versionCode
+      - name: Bump versionCode
+        id: bump_version
+        run: |
+          VERSION_LINE=$(grep '^version:' pubspec.yaml)
+          VERSION_NAME=$(echo $VERSION_LINE | cut -d '+' -f1 | awk '{print $2}')
+          VERSION_CODE=$(echo $VERSION_LINE | cut -d '+' -f2)
+          if [ -z "$VERSION_CODE" ]; then VERSION_CODE=1; fi
+          NEW_VERSION_CODE=$((VERSION_CODE + 1))
+          NEW_VERSION="${VERSION_NAME}+${NEW_VERSION_CODE}"
+          echo "Updating pubspec.yaml to version: $NEW_VERSION"
+          sed -i "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "version_code=${NEW_VERSION_CODE}" >> $GITHUB_OUTPUT
+
+      # 6. Build APK
       - name: Build APK
         run: flutter build apk --release
 
+      # 7. Build AAB
       - name: Build AAB
         run: flutter build appbundle --release
 
-      - name: Get version name
-        id: version
-        run: |
-          VERSION_NAME=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}')
-          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
-
+      # 8. Upload ke GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version_name }}
-          name: "Release v${{ steps.version.outputs.version_name }}"
+          tag_name: v${{ steps.bump_version.outputs.version_name }}+${{ steps.bump_version.outputs.version_code }}
+          name: "Release v${{ steps.bump_version.outputs.version_name }}+${{ steps.bump_version.outputs.version_code }}"
           draft: false
           prerelease: false
           files: |
