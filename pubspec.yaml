@@ -23,6 +23,12 @@ dependencies:
   # Google AdMob (ads banner, interstitial, native ads)
   google_mobile_ads: ^5.1.0
 
+  # HTTP request untuk fetch data
+  http: ^1.2.2
+
+  # HTML parser untuk extract konten
+  html: ^0.15.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
