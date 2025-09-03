@@ -3,12 +3,12 @@ plugins {
     id("kotlin-android")
     // Flutter Gradle Plugin
     id("dev.flutter.flutter-gradle-plugin")
-    // Google Services plugin (dibutuhkan untuk AdMob)
+    // Google Services plugin (AdMob)
     id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.hvac.fortworth" // ganti sesuai package name di AndroidManifest
+    namespace = "com.hvac.fortworth"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.hvac.fortworth" // pastikan sama dengan AndroidManifest
+        applicationId = "com.hvac.fortworth"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -31,13 +31,10 @@ android {
 
     buildTypes {
         release {
-            // TODO: kalau sudah siap ke Play Store, buat signingConfig sendiri
             signingConfig = signingConfigs.getByName("debug")
+            // sementara build cepat tanpa shrink
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isShrinkResources = false
         }
     }
 }
@@ -47,5 +44,5 @@ flutter {
 }
 
 dependencies {
-    implementation("com.google.android.gms:play-services-ads:23.1.0") // AdMob SDK
+    implementation("com.google.android.gms:play-services-ads:23.1.0")
 }
