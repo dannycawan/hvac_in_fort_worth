@@ -1,0 +1,46 @@
+name: Flutter Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout kode dari repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Install Flutter SDK
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'   # sesuaikan dengan versi Flutter kamu
+
+      # Cek versi Flutter
+      - run: flutter --version
+
+      # Install dependencies
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Build APK
+      - name: Build APK (release)
+        run: flutter build apk --release
+
+      # Build AAB (App Bundle)
+      - name: Build AAB (release)
+        run: flutter build appbundle --release
+
+      # Upload hasil build (APK & AAB)
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
