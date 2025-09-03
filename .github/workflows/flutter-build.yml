@@ -11,36 +11,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout kode dari repo
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-      # Install Flutter SDK
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'   # sesuaikan dengan versi Flutter kamu
+          flutter-version: '3.24.0'
 
-      # Cek versi Flutter
-      - run: flutter --version
-
-      # Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # Build APK
-      - name: Build APK (release)
+      - name: Build APK
         run: flutter build apk --release
 
-      # Build AAB (App Bundle)
-      - name: Build AAB (release)
+      - name: Build AAB
         run: flutter build appbundle --release
 
-      # Upload hasil build (APK & AAB)
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+      # Upload APK
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
+          name: hvac_in_fort_worth-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      # Upload AAB
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: hvac_in_fort_worth-aab
+          path: build/app/outputs/bundle/release/app-release.aab
