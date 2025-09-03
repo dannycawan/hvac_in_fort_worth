@@ -35,53 +35,28 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  List<String> listings = [];
+  bool isLoading = true;
+
   // AdMob IDs
   final String bannerAdUnitId = "ca-app-pub-6721734106426198/5259469376";
   final String interstitialAdUnitId = "ca-app-pub-6721734106426198/7710531994";
+  final String nativeAdUnitId = "ca-app-pub-6721734106426198/6120735266";
 
   BannerAd? _bannerAdTop;
   BannerAd? _bannerAdBottom;
   InterstitialAd? _interstitialAd;
   Timer? _interstitialTimer;
 
-  List<String> listings = [];
-  bool isLoading = true;
+  // Cache Native Ads
+  final Map<int, NativeAd> _nativeAds = {};
 
   @override
   void initState() {
     super.initState();
-    _loadContent();
-    _loadBannerAds();
-    _loadInterstitialAd();
+    _fetchListings();
 
-    // Timer untuk menampilkan interstitial tiap 3 menit
-    _interstitialTimer = Timer.periodic(const Duration(minutes: 3), (timer) {
-      _showInterstitialAd();
-    });
-  }
-
-  Future<void> _loadContent() async {
-    try {
-      final response = await http.get(
-        Uri.parse("https://dannycawan.github.io/site/"),
-      );
-      if (response.statusCode == 200) {
-        final document = html.parse(response.body);
-        final items = document.querySelectorAll("li");
-        setState(() {
-          listings = items.map((e) => e.text.trim()).toList();
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error load site: $e");
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  void _loadBannerAds() {
+    // Banner atas
     _bannerAdTop = BannerAd(
       adUnitId: bannerAdUnitId,
       size: AdSize.banner,
@@ -89,12 +64,71 @@ class _HomePageState extends State<HomePage> {
       listener: const BannerAdListener(),
     )..load();
 
+    // Banner bawah
     _bannerAdBottom = BannerAd(
       adUnitId: bannerAdUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
       listener: const BannerAdListener(),
     )..load();
+
+    // Load interstitial
+    _loadInterstitialAd();
+    _interstitialTimer = Timer(const Duration(minutes: 3), () {
+      _showInterstitialAd();
+    });
+  }
+
+  Future<void> _fetchListings() async {
+    try {
+      final response =
+          await http.get(Uri.parse("https://dannycawan.github.io/site/"));
+      if (response.statusCode == 200) {
+        final document = html.parse(response.body);
+        final items = document.querySelectorAll("li");
+
+        setState(() {
+          listings = items.map((e) => e.text.trim()).toList();
+          isLoading = false;
+        });
+
+        // Preload native ads untuk tiap 3 item
+        for (int i = 0; i < listings.length; i++) {
+          if (i > 0 && i % 3 == 0) {
+            _loadNativeAd(i);
+          }
+        }
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Scraping error: $e");
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  void _loadNativeAd(int index) {
+    final nativeAd = NativeAd(
+      adUnitId: nativeAdUnitId,
+      factoryId: 'listTile', // register factory di Android/iOS
+      request: const AdRequest(),
+      listener: NativeAdListener(
+        onAdLoaded: (ad) {
+          setState(() {
+            _nativeAds[index] = ad as NativeAd;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          debugPrint("NativeAd failed: $error");
+          ad.dispose();
+        },
+      ),
+    );
+    nativeAd.load();
   }
 
   void _loadInterstitialAd() {
@@ -102,9 +136,11 @@ class _HomePageState extends State<HomePage> {
       adUnitId: interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => _interstitialAd = ad,
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+        },
         onAdFailedToLoad: (error) {
-          debugPrint("Interstitial failed: $error");
+          debugPrint("InterstitialAd failed: $error");
         },
       ),
     );
@@ -124,26 +160,10 @@ class _HomePageState extends State<HomePage> {
     _bannerAdBottom?.dispose();
     _interstitialAd?.dispose();
     _interstitialTimer?.cancel();
+    for (final ad in _nativeAds.values) {
+      ad.dispose();
+    }
     super.dispose();
-  }
-
-  Widget _buildInlineBanner() {
-    final BannerAd inlineBanner = BannerAd(
-      adUnitId: bannerAdUnitId,
-      size: AdSize.mediumRectangle, // lebih besar dari banner biasa
-      request: const AdRequest(),
-      listener: const BannerAdListener(),
-    )..load();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      alignment: Alignment.center,
-      child: SizedBox(
-        height: inlineBanner.size.height.toDouble(),
-        width: inlineBanner.size.width.toDouble(),
-        child: AdWidget(ad: inlineBanner),
-      ),
-    );
   }
 
   @override
@@ -163,19 +183,22 @@ class _HomePageState extends State<HomePage> {
               width: _bannerAdTop!.size.width.toDouble(),
               child: AdWidget(ad: _bannerAdTop!),
             ),
+
+          // Konten scraping + native ads
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.builder(
                     itemCount: listings.length,
                     itemBuilder: (context, index) {
-                      if (index > 0 && index % 3 == 0) {
-                        // setiap 3 item → sisipkan iklan banner
+                      if (_nativeAds.containsKey(index)) {
                         return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ListTile(title: Text(listings[index])),
-                            _buildInlineBanner(),
+                            SizedBox(
+                              height: 100,
+                              child: AdWidget(ad: _nativeAds[index]!),
+                            ),
                           ],
                         );
                       }
@@ -183,6 +206,7 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
           ),
+
           // Banner bawah
           if (_bannerAdBottom != null)
             SizedBox(
