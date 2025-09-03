@@ -1,10 +1,12 @@
-name: Flutter Build
+name: Flutter Build & Release
 
 on:
   push:
     branches:
       - main
-  pull_request:
+
+permissions:
+  contents: write  # penting supaya bisa buat release
 
 jobs:
   build:
@@ -17,7 +19,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.27.0'   # Paksa pakai Flutter terbaru (Dart 3.8.x)
 
       - name: Install dependencies
         run: flutter pub get
@@ -28,16 +30,19 @@ jobs:
       - name: Build AAB
         run: flutter build appbundle --release
 
-      # Upload APK
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: hvac_in_fort_worth-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+      - name: Get version name
+        id: version
+        run: |
+          VERSION_NAME=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}')
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
 
-      # Upload AAB
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: hvac_in_fort_worth-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          tag_name: v${{ steps.version.outputs.version_name }}
+          name: "Release v${{ steps.version.outputs.version_name }}"
+          draft: false
+          prerelease: false
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
