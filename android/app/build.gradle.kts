@@ -1,16 +1,14 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // Flutter Gradle Plugin
+    // Flutter Gradle Plugin harus terakhir
     id("dev.flutter.flutter-gradle-plugin")
-    // Google Services plugin (AdMob)
-    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.hvac.fortworth"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973" // pakai versi terbaru sesuai error build
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -18,7 +16,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = "11"
     }
 
     defaultConfig {
@@ -31,10 +29,20 @@ android {
 
     buildTypes {
         release {
+            // TODO: ganti dengan signingConfig release sebelum upload ke Play Store
             signingConfig = signingConfigs.getByName("debug")
-            // sementara build cepat tanpa shrink
+            // sementara biar build cepat & stabil
             isMinifyEnabled = false
             isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            // opsional, supaya debug lebih gampang
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
         }
     }
 }
@@ -44,5 +52,6 @@ flutter {
 }
 
 dependencies {
+    // AdMob SDK
     implementation("com.google.android.gms:play-services-ads:23.1.0")
 }
