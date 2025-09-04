@@ -1,0 +1,40 @@
+name: hvac_in_fort_worth
+description: "Commercial HVAC in Fort Worth - Flutter App with AdMob"
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI & Icons
+  cupertino_icons: ^1.0.8
+
+  # Launch external apps (telp, email, browser, dll.)
+  url_launcher: ^6.3.0
+
+  # WebView untuk load website (dannycawan.github.io/site/)
+  webview_flutter: ^4.10.0
+
+  # Google AdMob (ads banner, interstitial, native ads)
+  google_mobile_ads: ^5.1.0
+
+  # HTTP request untuk fetch data
+  http: ^1.2.2
+
+  # HTML parser untuk extract konten
+  html: ^0.15.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Linter untuk jaga kualitas kode
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
