@@ -1,8 +1,10 @@
 plugins {
     // Android Gradle Plugin
     id("com.android.application") version "8.7.3" apply false
-    // Kotlin Android
-    kotlin("android") version "1.9.25" apply false
+
+    // Kotlin Android → jangan hardcode versi, biar pakai bawaan Flutter SDK
+    id("org.jetbrains.kotlin.android") apply false
+
     // Tidak pakai Firebase → google-services tidak perlu
 }
 
