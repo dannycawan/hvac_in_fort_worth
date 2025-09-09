@@ -1,14 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-
-// ===== Dummy Data Model =====
-class Business {
-  final String name;
-  final double rating;
-  final int reviews;
-
-  Business({required this.name, required this.rating, required this.reviews});
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,242 +10,206 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: BusinessListPage(),
+      title: 'Listing App with Ads',
+      theme: ThemeData(primarySwatch: Colors.green),
+      home: const HomePage(),
     );
   }
 }
 
-class BusinessListPage extends StatefulWidget {
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
   @override
-  State<BusinessListPage> createState() => _BusinessListPageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _BusinessListPageState extends State<BusinessListPage> {
-  List<Business> allData = [
-    Business(name: "Store A", rating: 4.5, reviews: 120),
-    Business(name: "Store B", rating: 3.8, reviews: 80),
-    Business(name: "Store C", rating: 5.0, reviews: 300),
-    Business(name: "Store D", rating: 2.5, reviews: 40),
-    Business(name: "Store E", rating: 4.2, reviews: 200),
-  ];
+class _HomePageState extends State<HomePage> {
+  // Ads
+  BannerAd? _topBanner;
+  BannerAd? _bottomBanner;
+  InterstitialAd? _interstitialAd;
+  AppOpenAd? _appOpenAd;
+  int _clickCount = 0;
 
-  List<dynamic> filteredData = [];
+  // Filters
+  double _rating = 3;
+  RangeValues _reviews = const RangeValues(0, 1000);
 
-  int? selectedRating;
-  int? selectedReviews;
-  String selectedSort = "Top";
-
-  final List<int?> ratingOptions = [null, 1, 2, 3, 4, 5];
-  final List<int?> reviewOptions = [null, 10, 50, 100, 500, 1000];
-
-  int clickCounter = 0;
-  InterstitialAd? interstitialAd;
-  AppOpenAd? appOpenAd;
+  // Dummy data
+  final List<Map<String, dynamic>> _items = List.generate(
+    20,
+    (index) => {
+      "title": "Item ${index + 1}",
+      "rating": (1 + (index % 5)).toDouble(),
+      "reviews": (index + 1) * 123,
+    },
+  );
 
   @override
   void initState() {
     super.initState();
-    applyFilters();
-    loadInterstitialAd();
-    loadAppOpenAd();
+    _loadBanners();
+    _loadInterstitial();
+    _loadAppOpenAd();
+    Future.delayed(const Duration(seconds: 3), () {
+      _showAppOpenAd();
+    });
   }
 
-  void applyFilters() {
-    List<Business> temp = allData.where((item) {
-      final matchRating = selectedRating == null || item.rating >= selectedRating!;
-      final matchReviews = selectedReviews == null || item.reviews >= selectedReviews!;
-      return matchRating && matchReviews;
-    }).toList();
-
-    if (selectedSort == "Top") {
-      temp.sort((a, b) => b.rating.compareTo(a.rating));
-    } else {
-      temp.sort((a, b) => b.reviews.compareTo(a.reviews));
-    }
-
-    filteredData = insertAds(temp);
-    setState(() {});
-  }
-
-  List<dynamic> insertAds(List<Business> list) {
-    List<dynamic> withAds = [];
-    for (var item in list) {
-      withAds.add(item);
-      withAds.add("ad");
-    }
-    return withAds;
-  }
-
-  // ====== AdMob Logic ======
-
-  void loadInterstitialAd() {
-    InterstitialAd.load(
-      adUnitId: "ca-app-pub-6721734106426198/7710531994",
+  void _loadBanners() {
+    _topBanner = BannerAd(
+      adUnitId: "ca-app-pub-3940256099942544/6300978111", // ganti dengan punyamu
+      size: AdSize.banner,
       request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => interstitialAd = ad,
-        onAdFailedToLoad: (error) => interstitialAd = null,
-      ),
-    );
-  }
+      listener: const BannerAdListener(),
+    )..load();
 
-  void showInterstitialAd() {
-    if (interstitialAd != null) {
-      interstitialAd!.show();
-      interstitialAd = null;
-      loadInterstitialAd();
-    }
-  }
-
-  void loadAppOpenAd() {
-    AppOpenAd.load(
-      adUnitId: "ca-app-pub-6721734106426198/2181490258",
-      request: const AdRequest(),
-      adLoadCallback: AppOpenAdLoadCallback(
-        onAdLoaded: (ad) {
-          appOpenAd = ad;
-          Future.delayed(const Duration(seconds: 3), () {
-            appOpenAd?.show();
-            appOpenAd = null;
-          });
-        },
-        onAdFailedToLoad: (error) => appOpenAd = null,
-      ),
-      orientation: AppOpenAd.orientationPortrait,
-    );
-  }
-
-  BannerAd buildBannerAd() {
-    return BannerAd(
-      adUnitId: "ca-app-pub-6721734106426198/5259469376",
+    _bottomBanner = BannerAd(
+      adUnitId: "ca-app-pub-3940256099942544/6300978111", // ganti dengan punyamu
       size: AdSize.banner,
       request: const AdRequest(),
       listener: const BannerAdListener(),
     )..load();
   }
 
-  void handleClick() {
-    clickCounter++;
-    if (clickCounter % 3 == 0) {
-      showInterstitialAd();
+  void _loadInterstitial() {
+    InterstitialAd.load(
+      adUnitId: "ca-app-pub-3940256099942544/1033173712", // ganti dengan punyamu
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) => _interstitialAd = ad,
+        onAdFailedToLoad: (error) => _interstitialAd = null,
+      ),
+    );
+  }
+
+  void _showInterstitial() {
+    if (_interstitialAd != null) {
+      _interstitialAd!.show();
+      _interstitialAd = null;
+      _loadInterstitial();
+    }
+  }
+
+  void _loadAppOpenAd() {
+    AppOpenAd.load(
+      adUnitId: "ca-app-pub-3940256099942544/3419835294", // ganti dengan punyamu
+      request: const AdRequest(),
+      adLoadCallback: AppOpenAdLoadCallback(
+        onAdLoaded: (ad) => _appOpenAd = ad,
+        onAdFailedToLoad: (error) => _appOpenAd = null,
+      ),
+    );
+  }
+
+  void _showAppOpenAd() {
+    if (_appOpenAd != null) {
+      _appOpenAd!.show();
+      _appOpenAd = null;
     }
   }
 
   @override
+  void dispose() {
+    _topBanner?.dispose();
+    _bottomBanner?.dispose();
+    _interstitialAd?.dispose();
+    _appOpenAd?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final topBanner = buildBannerAd();
-    final bottomBanner = buildBannerAd();
+    final filtered = _items.where((item) {
+      return item["rating"] >= _rating &&
+          item["reviews"] >= _reviews.start &&
+          item["reviews"] <= _reviews.end;
+    }).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Business List"),
-        backgroundColor: Colors.green,
-      ),
+      appBar: AppBar(title: const Text("Listing App with Ads")),
       body: Column(
         children: [
-          // ====== Banner Fixed Atas ======
-          SizedBox(
-            height: topBanner.size.height.toDouble(),
-            child: AdWidget(ad: topBanner),
+          if (_topBanner != null)
+            SizedBox(height: 50, child: AdWidget(ad: _topBanner!)),
+
+          // Filter UI
+          ExpansionTile(
+            title: const Text("Filters"),
+            children: [
+              ListTile(
+                title: const Text("Minimum Rating"),
+                subtitle: Slider(
+                  min: 1,
+                  max: 5,
+                  divisions: 4,
+                  value: _rating,
+                  label: _rating.toString(),
+                  onChanged: (val) {
+                    setState(() => _rating = val);
+                  },
+                ),
+              ),
+              ListTile(
+                title: const Text("Reviews Range"),
+                subtitle: RangeSlider(
+                  min: 0,
+                  max: 5000, // besar supaya fleksibel
+                  values: _reviews,
+                  labels: RangeLabels(
+                    _reviews.start.round().toString(),
+                    _reviews.end.round().toString(),
+                  ),
+                  onChanged: (val) {
+                    setState(() => _reviews = val);
+                  },
+                ),
+              ),
+            ],
           ),
 
-          // ====== Filter Bar ======
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButton<int?>(
-                    isExpanded: true,
-                    value: selectedRating,
-                    hint: const Text("Rating"),
-                    items: ratingOptions.map((value) {
-                      return DropdownMenuItem<int?>(
-                        value: value,
-                        child: Text(value == null ? "Any" : "$value+ ⭐"),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() => selectedRating = val);
-                      applyFilters();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButton<int?>(
-                    isExpanded: true,
-                    value: selectedReviews,
-                    hint: const Text("Reviews"),
-                    items: reviewOptions.map((value) {
-                      return DropdownMenuItem<int?>(
-                        value: value,
-                        child: Text(value == null ? "Any" : "$value+ Reviews"),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() => selectedReviews = val);
-                      applyFilters();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: selectedSort,
-                    items: ["Top", "Most"].map((value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value == "Top" ? "Top Rating" : "Most Reviews"),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() => selectedSort = val!);
-                      applyFilters();
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-
-          // ====== List with Ads ======
+          // List with ads
           Expanded(
             child: ListView.builder(
-              itemCount: filteredData.length,
+              itemCount: filtered.length,
               itemBuilder: (context, index) {
-                final item = filteredData[index];
-
-                if (item == "ad") {
-                  final inlineBanner = buildBannerAd();
-                  return SizedBox(
-                    height: inlineBanner.size.height.toDouble(),
-                    child: AdWidget(ad: inlineBanner),
-                  );
-                }
-
-                final business = item as Business;
-                return ListTile(
-                  title: Text(business.name),
-                  subtitle: Text("⭐ ${business.rating} - ${business.reviews} reviews"),
-                  onTap: () => handleClick(),
+                final item = filtered[index];
+                return Column(
+                  children: [
+                    ListTile(
+                      title: Text(item["title"]),
+                      subtitle: Text(
+                          "⭐ ${item["rating"]} | ${item["reviews"]} reviews"),
+                      onTap: () {
+                        _clickCount++;
+                        if (_clickCount % 3 == 0) {
+                          _showInterstitial();
+                        }
+                      },
+                    ),
+                    SizedBox(
+                      height: 120,
+                      child: AdWidget(
+                        ad: BannerAd(
+                          adUnitId:
+                              "ca-app-pub-3940256099942544/6300978111", // ganti dengan punyamu
+                          size: AdSize.mediumRectangle,
+                          request: const AdRequest(),
+                          listener: const BannerAdListener(),
+                        )..load(),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
           ),
 
-          // ====== Banner Fixed Bawah ======
-          SizedBox(
-            height: bottomBanner.size.height.toDouble(),
-            child: AdWidget(ad: bottomBanner),
-          ),
+          if (_bottomBanner != null)
+            SizedBox(height: 50, child: AdWidget(ad: _bottomBanner!)),
         ],
       ),
     );
