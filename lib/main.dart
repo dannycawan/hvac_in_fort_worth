@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'flutter_data.dart'; // hasil generate dari script Python
+import 'flutter_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +22,10 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+        ),
       ),
       home: const HomePage(),
     );
@@ -36,23 +40,42 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // AdMob Ad Units (ganti dengan unit ID milikmu di AdMob)
-  final String bannerAdUnitId = "ca-app-pub-3940256099942544/6300978111"; // test ID
-  final String interstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712"; // test ID
+  // Ganti dengan unit ID milikmu di AdMob untuk produksi
+  final String bannerAdUnitId =
+      "ca-app-pub-3940256099942544/6300978111"; // Contoh: "ca-app-pub-YOUR_ADMOB_ID/YOUR_BANNER_AD_UNIT_ID"
+  final String interstitialAdUnitId =
+      "ca-app-pub-3940256099942544/1033173712"; // Contoh: "ca-app-pub-YOUR_ADMOB_ID/YOUR_INTERSTITIAL_AD_UNIT_ID"
+  final String nativeAdUnitId =
+      "ca-app-pub-3940256099942544/2247696110"; // Contoh: "ca-app-pub-YOUR_ADMOB_ID/YOUR_NATIVE_AD_UNIT_ID"
 
   BannerAd? _bannerAd;
   InterstitialAd? _interstitialAd;
   Timer? _interstitialTimer;
+
+  // Filter dan Pencarian
+  TextEditingController _searchController = TextEditingController();
+  String _searchText = '';
+  double _minRating = 0.0;
+
+  // Native Ad related
+  final List<NativeAd> _nativeAds = [];
+  final int _adInterval = 5; // Tampilkan iklan setiap 5 item data
 
   @override
   void initState() {
     super.initState();
     _loadBannerAd();
     _loadInterstitialAd();
+    _loadNativeAds();
 
-    // tampilkan interstitial otomatis setelah 2 menit
-    _interstitialTimer = Timer(const Duration(minutes: 2), () {
+    _interstitialTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
       _showInterstitialAd();
+    });
+
+    _searchController.addListener(() {
+      setState(() {
+        _searchText = _searchController.text;
+      });
     });
   }
 
@@ -61,7 +84,13 @@ class _HomePageState extends State<HomePage> {
       adUnitId: bannerAdUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
-      listener: const BannerAdListener(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) => debugPrint('BannerAd loaded.'),
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('BannerAd failed to load: $error');
+          ad.dispose();
+        },
+      ),
     )..load();
   }
 
@@ -70,7 +99,22 @@ class _HomePageState extends State<HomePage> {
       adUnitId: interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => _interstitialAd = ad,
+        onAdLoaded: (ad) {
+          debugPrint('InterstitialAd loaded.');
+          _interstitialAd = ad;
+          _interstitialAd!.fullScreenContentCallback =
+              FullScreenContentCallback(
+                onAdDismissedFullScreenContent: (ad) {
+                  ad.dispose();
+                  _loadInterstitialAd();
+                },
+                onAdFailedToShowFullScreenContent: (ad, error) {
+                  debugPrint('InterstitialAd failed to show: $error');
+                  ad.dispose();
+                  _loadInterstitialAd();
+                },
+              );
+        },
         onAdFailedToLoad: (error) => debugPrint("Interstitial failed: $error"),
       ),
     );
@@ -79,8 +123,31 @@ class _HomePageState extends State<HomePage> {
   void _showInterstitialAd() {
     if (_interstitialAd != null) {
       _interstitialAd!.show();
-      _interstitialAd = null;
-      _loadInterstitialAd();
+    } else {
+      debugPrint('InterstitialAd not ready yet.');
+    }
+  }
+
+  void _loadNativeAds() {
+    for (int i = 0; i < (hvacData.length / _adInterval).ceil(); i++) {
+      final nativeAd = NativeAd(
+        adUnitId: nativeAdUnitId,
+        factoryId: 'listTile',
+        request: const AdRequest(),
+        listener: NativeAdListener(
+          onAdLoaded: (ad) {
+            debugPrint('NativeAd loaded: ${ad.adUnitId}');
+            setState(() {
+              _nativeAds.add(ad as NativeAd);
+            });
+          },
+          onAdFailedToLoad: (ad, error) {
+            debugPrint('NativeAd failed to load: $error');
+            ad.dispose();
+          },
+        ),
+      );
+      nativeAd.load();
     }
   }
 
@@ -89,6 +156,10 @@ class _HomePageState extends State<HomePage> {
     _bannerAd?.dispose();
     _interstitialAd?.dispose();
     _interstitialTimer?.cancel();
+    _searchController.dispose();
+    for (var ad in _nativeAds) {
+      ad.dispose();
+    }
     super.dispose();
   }
 
@@ -96,10 +167,27 @@ class _HomePageState extends State<HomePage> {
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Tidak bisa membuka: $url")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Tidak bisa membuka: $url")));
     }
+  }
+
+  List<Map<String, dynamic>> get _filteredHvacData {
+    return hvacData.where((item) {
+      final name = item["name"]?.toLowerCase() ?? '';
+      final address = item["address_full"]?.toLowerCase() ?? '';
+      final rating = double.tryParse(item["rating"] ?? '0.0') ?? 0.0;
+
+      final matchesSearch =
+          _searchText.isEmpty ||
+          name.contains(_searchText.toLowerCase()) ||
+          address.contains(_searchText.toLowerCase());
+
+      final matchesRating = rating >= _minRating;
+
+      return matchesSearch && matchesRating;
+    }).toList();
   }
 
   @override
@@ -107,8 +195,14 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("HVAC in Fort Worth"),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () {
+              _showFilterDialog(context);
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -120,44 +214,136 @@ class _HomePageState extends State<HomePage> {
               child: AdWidget(ad: _bannerAd!),
             ),
 
-          // List data dari flutter_data.dart
-          Expanded(
-            child: ListView.builder(
-              itemCount: hvacData.length,
-              itemBuilder: (context, index) {
-                final item = hvacData[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: ListTile(
-                    title: Text(item["name"] ?? "No Name",
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item["address_full"] ?? ""),
-                        Text("â­ ${item["rating"]} (${item["reviews_count"]} reviews)"),
-                      ],
-                    ),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == "map" && (item["map_url"] ?? "").isNotEmpty) {
-                          _launchUrl(item["map_url"]);
-                        } else if (value == "website" && (item["website"] ?? "").isNotEmpty) {
-                          _launchUrl(item["website"]);
-                        } else if (value == "phone" && (item["phone_number"] ?? "").isNotEmpty) {
-                          _launchUrl("tel:${item["phone_number"]}");
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(value: "map", child: Text("ðŸ“ Maps")),
-                        const PopupMenuItem(value: "website", child: Text("ðŸŒ Website")),
-                        const PopupMenuItem(value: "phone", child: Text("ðŸ“ž Call")),
-                      ],
-                    ),
-                  ),
-                );
-              },
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Cari berdasarkan nama atau alamat',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+              ),
             ),
+          ),
+
+          Expanded(
+            child: _filteredHvacData.isEmpty
+                ? const Center(child: Text('Tidak ada data yang ditemukan.'))
+                : ListView.builder(
+                    itemCount:
+                        _filteredHvacData.length +
+                        (_nativeAds.length * 1), // Adjust item count for ads
+                    itemBuilder: (context, index) {
+                      // Calculate the actual data index, accounting for ads
+                      final int dataIndex = index - (index ~/ _adInterval);
+
+                      if (index > 0 && index % _adInterval == 0) {
+                        // This is an ad position
+                        final int adIndex = (index ~/ _adInterval) - 1;
+                        if (adIndex < _nativeAds.length) {
+                          return Container(
+                            margin: const EdgeInsets.symmetric(vertical: 10),
+                            height:
+                                300, // Adjust height as needed for native ad
+                            child: AdWidget(ad: _nativeAds[adIndex]),
+                          );
+                        } else {
+                          return const SizedBox.shrink(); // Fallback if ad not loaded yet
+                        }
+                      } else if (dataIndex < _filteredHvacData.length) {
+                        // This is a data item
+                        final item = _filteredHvacData[dataIndex];
+                        final rating = item["rating"] ?? "N/A";
+                        final reviewsCount = item["reviews_count"] ?? "0";
+                        final phoneNumber = item["phone_number"] ?? "";
+                        final website = item["website"] ?? "";
+                        final mapUrl = item["map_url"] ?? "";
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          elevation: 2,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item["name"] ?? "No Name",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  item["address_full"] ??
+                                      "Alamat tidak tersedia",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.star,
+                                      color: Colors.amber,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '$rating ($reviewsCount reviews)',
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8.0,
+                                  runSpacing: 4.0,
+                                  children: [
+                                    if (phoneNumber.isNotEmpty)
+                                      ActionChip(
+                                        avatar: const Icon(
+                                          Icons.phone,
+                                          size: 18,
+                                        ),
+                                        label: const Text('Telepon'),
+                                        onPressed: () =>
+                                            _launchUrl('tel:$phoneNumber'),
+                                      ),
+                                    if (website.isNotEmpty)
+                                      ActionChip(
+                                        avatar: const Icon(
+                                          Icons.public,
+                                          size: 18,
+                                        ),
+                                        label: const Text('Website'),
+                                        onPressed: () => _launchUrl(website),
+                                      ),
+                                    if (mapUrl.isNotEmpty)
+                                      ActionChip(
+                                        avatar: const Icon(Icons.map, size: 18),
+                                        label: const Text('Peta'),
+                                        onPressed: () => _launchUrl(mapUrl),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      } else {
+                        return const SizedBox.shrink(); // Should not happen if itemCount is correct
+                      }
+                    },
+                  ),
           ),
 
           // Banner bawah
@@ -169,6 +355,57 @@ class _HomePageState extends State<HomePage> {
             ),
         ],
       ),
+    );
+  }
+
+  void _showFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Filter Data'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Rating Minimal:'),
+                Slider(
+                  value: _minRating,
+                  min: 0.0,
+                  max: 5.0,
+                  divisions: 10,
+                  label: _minRating.toStringAsFixed(1),
+                  onChanged: (double value) {
+                    setState(() {
+                      _minRating = value;
+                    });
+                  },
+                ),
+                Text('Rating: ${_minRating.toStringAsFixed(1)} ke atas'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Terapkan'),
+              onPressed: () {
+                setState(() {}); // Trigger rebuild with new filter
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Reset'),
+              onPressed: () {
+                setState(() {
+                  _minRating = 0.0;
+                  _searchController.clear();
+                });
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
