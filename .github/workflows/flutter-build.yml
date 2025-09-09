@@ -1,0 +1,47 @@
+name: Flutter Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.27.0" # Versi Flutter yang stabil di runner
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (release)
+        run: flutter build apk --release
+
+      - name: Build AAB (release)
+        run: flutter build appbundle --release
+
+      # Debug: cek isi folder output
+      - name: List build outputs
+        run: ls -R build/app/outputs
+
+      # Upload APK sebagai artifact (pakai wildcard)
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hvac-apk
+          path: build/app/outputs/flutter-apk/*.apk
+
+      # Upload AAB sebagai artifact (pakai wildcard)
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: hvac-aab
+          path: build/app/outputs/bundle/release/*.aab
