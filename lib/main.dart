@@ -41,9 +41,11 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   // Ganti dengan unit ID milikmu di AdMob untuk produksi
+<<<<<<< HEAD
   final String bannerAdUnitId = "ca-app-pub-3940256099942544/6300978111";
   final String interstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712";
   final String nativeAdUnitId = "ca-app-pub-3940256099942544/2247696110";
+
 
   BannerAd? _bannerAd;
   InterstitialAd? _interstitialAd;
@@ -230,15 +232,27 @@ class _HomePageState extends State<HomePage> {
                 ? const Center(child: Text('Tidak ada data yang ditemukan.'))
                 : ListView.builder(
                     itemCount:
+<<<<<<< HEAD
                         _filteredHvacData.length + (_nativeAds.length * 1),
                     itemBuilder: (context, index) {
                       final int dataIndex = index - (index ~/ _adInterval);
 
                       if (index > 0 && index % _adInterval == 0) {
+=======
+                        _filteredHvacData.length +
+                        (_nativeAds.length * 1), // Adjust item count for ads
+                    itemBuilder: (context, index) {
+                      // Calculate the actual data index, accounting for ads
+                      final int dataIndex = index - (index ~/ _adInterval);
+
+                      if (index > 0 && index % _adInterval == 0) {
+                        // This is an ad position
+>>>>>>> origin/main
                         final int adIndex = (index ~/ _adInterval) - 1;
                         if (adIndex < _nativeAds.length) {
                           return Container(
                             margin: const EdgeInsets.symmetric(vertical: 10),
+<<<<<<< HEAD
                             height: 300,
                             child: AdWidget(ad: _nativeAds[adIndex]),
                           );
@@ -246,6 +260,17 @@ class _HomePageState extends State<HomePage> {
                           return const SizedBox.shrink();
                         }
                       } else if (dataIndex < _filteredHvacData.length) {
+=======
+                            height:
+                                300, // Adjust height as needed for native ad
+                            child: AdWidget(ad: _nativeAds[adIndex]),
+                          );
+                        } else {
+                          return const SizedBox.shrink(); // Fallback if ad not loaded yet
+                        }
+                      } else if (dataIndex < _filteredHvacData.length) {
+                        // This is a data item
+>>>>>>> origin/main
                         final item = _filteredHvacData[dataIndex];
                         final rating = item["rating"] ?? "N/A";
                         final reviewsCount = item["reviews_count"] ?? "0";
@@ -275,9 +300,15 @@ class _HomePageState extends State<HomePage> {
                                 Text(
                                   item["address_full"] ??
                                       "Alamat tidak tersedia",
+<<<<<<< HEAD
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey[700], // HAPUS const
+=======
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[700],
+>>>>>>> origin/main
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -291,9 +322,13 @@ class _HomePageState extends State<HomePage> {
                                     const SizedBox(width: 4),
                                     Text(
                                       '$rating ($reviewsCount reviews)',
+<<<<<<< HEAD
                                       style: const TextStyle(
                                         fontSize: 14,
                                       ), // Bisa tetap const karena tidak pakai Colors.grey[xxx]
+=======
+                                      style: const TextStyle(fontSize: 14),
+>>>>>>> origin/main
                                     ),
                                   ],
                                 ),
@@ -334,6 +369,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         );
                       } else {
+<<<<<<< HEAD
                         return const SizedBox.shrink();
                       }
                     },
