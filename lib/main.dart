@@ -41,12 +41,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   // Ganti dengan unit ID milikmu di AdMob untuk produksi
-  final String bannerAdUnitId =
-      "ca-app-pub-3940256099942544/6300978111"; // Contoh: "ca-app-pub-YOUR_ADMOB_ID/YOUR_BANNER_AD_UNIT_ID"
-  final String interstitialAdUnitId =
-      "ca-app-pub-3940256099942544/1033173712"; // Contoh: "ca-app-pub-YOUR_ADMOB_ID/YOUR_INTERSTITIAL_AD_UNIT_ID"
-  final String nativeAdUnitId =
-      "ca-app-pub-3940256099942544/2247696110"; // Contoh: "ca-app-pub-YOUR_ADMOB_ID/YOUR_NATIVE_AD_UNIT_ID"
+  final String bannerAdUnitId = "ca-app-pub-3940256099942544/6300978111";
+  final String interstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712";
+  final String nativeAdUnitId = "ca-app-pub-3940256099942544/2247696110";
 
   BannerAd? _bannerAd;
   InterstitialAd? _interstitialAd;
@@ -233,27 +230,22 @@ class _HomePageState extends State<HomePage> {
                 ? const Center(child: Text('Tidak ada data yang ditemukan.'))
                 : ListView.builder(
                     itemCount:
-                        _filteredHvacData.length +
-                        (_nativeAds.length * 1), // Adjust item count for ads
+                        _filteredHvacData.length + (_nativeAds.length * 1),
                     itemBuilder: (context, index) {
-                      // Calculate the actual data index, accounting for ads
                       final int dataIndex = index - (index ~/ _adInterval);
 
                       if (index > 0 && index % _adInterval == 0) {
-                        // This is an ad position
                         final int adIndex = (index ~/ _adInterval) - 1;
                         if (adIndex < _nativeAds.length) {
                           return Container(
                             margin: const EdgeInsets.symmetric(vertical: 10),
-                            height:
-                                300, // Adjust height as needed for native ad
+                            height: 300,
                             child: AdWidget(ad: _nativeAds[adIndex]),
                           );
                         } else {
-                          return const SizedBox.shrink(); // Fallback if ad not loaded yet
+                          return const SizedBox.shrink();
                         }
                       } else if (dataIndex < _filteredHvacData.length) {
-                        // This is a data item
                         final item = _filteredHvacData[dataIndex];
                         final rating = item["rating"] ?? "N/A";
                         final reviewsCount = item["reviews_count"] ?? "0";
@@ -283,9 +275,9 @@ class _HomePageState extends State<HomePage> {
                                 Text(
                                   item["address_full"] ??
                                       "Alamat tidak tersedia",
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey[700],
+                                    color: Colors.grey[700], // HAPUS const
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -299,7 +291,9 @@ class _HomePageState extends State<HomePage> {
                                     const SizedBox(width: 4),
                                     Text(
                                       '$rating ($reviewsCount reviews)',
-                                      style: const TextStyle(fontSize: 14),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                      ), // Bisa tetap const karena tidak pakai Colors.grey[xxx]
                                     ),
                                   ],
                                 ),
@@ -340,7 +334,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         );
                       } else {
-                        return const SizedBox.shrink(); // Should not happen if itemCount is correct
+                        return const SizedBox.shrink();
                       }
                     },
                   ),
