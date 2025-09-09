@@ -1,115 +1,105 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'flutter_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await MobileAds.instance.initialize();
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
+/// Global App Open Ad reference
+AppOpenAd? appOpenAd;
+
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Product List with Ads',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: ProductListPage(),
+      title: 'HVAC in Fort Worth',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      home: const HomePage(),
     );
   }
 }
 
-class Product {
-  final String name;
-  final double rating;
-  final int reviews;
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
-  Product(this.name, this.rating, this.reviews);
-}
-
-class ProductListPage extends StatefulWidget {
   @override
-  State<ProductListPage> createState() => _ProductListPageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _ProductListPageState extends State<ProductListPage> {
-  List<Product> allProducts = List.generate(
-    30,
-    (i) => Product("Product $i", (i % 5 + 1).toDouble(), (i + 1) * 150),
-  );
-  List<Product> filteredProducts = [];
+class _HomePageState extends State<HomePage> {
+  // Ad Unit IDs
+  final String bannerAdUnitId = "ca-app-pub-6721734106426198/5259469376";
+  final String interstitialAdUnitId = "ca-app-pub-6721734106426198/7710531994";
+  final String nativeAdUnitId = "ca-app-pub-6721734106426198/6120735266";
+  final String appOpenAdUnitId = "ca-app-pub-6721734106426198/2181490258";
 
-  // Ads
-  BannerAd? topBanner;
-  BannerAd? bottomBanner;
-  InterstitialAd? interstitialAd;
-  AppOpenAd? appOpenAd;
+  BannerAd? _bannerAd;
+  InterstitialAd? _interstitialAd;
+  int _clickCount = 0;
 
-  int clickCount = 0;
-  double minRating = 1;
-  double maxRating = 5;
-  RangeValues reviewRange = const RangeValues(0, 1000);
-  int maxReviews = 1000;
+  // Search & Filter
+  TextEditingController _searchController = TextEditingController();
+  String _searchText = '';
+  double _minRating = 0.0;
+  double _maxRating = 5.0;
+  double _minReviews = 0.0;
+  double _maxReviews = 1000.0;
+
+  // Native ads
+  final List<NativeAd> _nativeAds = [];
+  final int _adInterval = 2; // every 2 listings
 
   @override
   void initState() {
     super.initState();
-    filteredProducts = List.from(allProducts);
-
-    // set max reviews dynamically
-    maxReviews = allProducts.map((p) => p.reviews).reduce((a, b) => a > b ? a : b);
-    reviewRange = RangeValues(0, maxReviews.toDouble());
-
-    _loadBannerAds();
+    _loadBannerAd();
     _loadInterstitialAd();
+    _loadNativeAds();
     _loadAppOpenAd();
 
-    // show app open ad after delay
+    // Delay App Open Ad 3 seconds once
     Future.delayed(const Duration(seconds: 3), () {
-      appOpenAd?.show();
+      if (appOpenAd != null) {
+        appOpenAd!.show();
+        appOpenAd = null; // only show once per session
+      }
     });
-  }
 
-  void _loadBannerAds() {
-    topBanner = BannerAd(
-      adUnitId: "ca-app-pub-6721734106426198/5259469376",
-      size: AdSize.banner,
-      request: AdRequest(),
-      listener: BannerAdListener(),
-    )..load();
+    _searchController.addListener(() {
+      setState(() {
+        _searchText = _searchController.text;
+      });
+    });
 
-    bottomBanner = BannerAd(
-      adUnitId: "ca-app-pub-6721734106426198/5259469376",
-      size: AdSize.banner,
-      request: AdRequest(),
-      listener: BannerAdListener(),
-    )..load();
-  }
-
-  void _loadInterstitialAd() {
-    InterstitialAd.load(
-      adUnitId: "ca-app-pub-6721734106426198/7710531994",
-      request: AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => interstitialAd = ad,
-        onAdFailedToLoad: (err) => interstitialAd = null,
-      ),
-    );
-  }
-
-  void _showInterstitialAd() {
-    if (interstitialAd != null) {
-      interstitialAd!.show();
-      interstitialAd = null;
-      _loadInterstitialAd(); // preload lagi
+    // Dynamic max reviews from data
+    final reviews = hvacData
+        .map((item) => double.tryParse(item["reviews_count"] ?? '0') ?? 0)
+        .toList();
+    if (reviews.isNotEmpty) {
+      _maxReviews = reviews.reduce((a, b) => a > b ? a : b);
     }
   }
 
   void _loadAppOpenAd() {
     AppOpenAd.load(
-      adUnitId: "ca-app-pub-6721734106426198/2181490258",
-      orientation: AppOpenAd.orientationPortrait,
-      request: AdRequest(),
+      adUnitId: appOpenAdUnitId,
+      request: const AdRequest(),
       adLoadCallback: AppOpenAdLoadCallback(
         onAdLoaded: (ad) => appOpenAd = ad,
         onAdFailedToLoad: (err) => appOpenAd = null,
@@ -117,138 +107,350 @@ class _ProductListPageState extends State<ProductListPage> {
     );
   }
 
-  void _applyFilters() {
-    setState(() {
-      filteredProducts = allProducts.where((p) {
-        return p.rating >= minRating &&
-            p.rating <= maxRating &&
-            p.reviews >= reviewRange.start &&
-            p.reviews <= reviewRange.end;
-      }).toList();
-    });
+  void _loadBannerAd() {
+    _bannerAd = BannerAd(
+      adUnitId: bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) => debugPrint('Banner loaded'),
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          debugPrint('Banner failed: $error');
+        },
+      ),
+    )..load();
   }
 
-  Widget _buildNativeAd() {
-    return Container(
-      margin: const EdgeInsets.all(8),
-      height: 120,
-      color: Colors.grey[200],
-      child: Center(
-        child: AdWidget(
-          ad: NativeAd(
-            adUnitId: "ca-app-pub-6721734106426198/6120735266",
-            factoryId: 'listTile',
-            request: AdRequest(),
-            listener: NativeAdListener(),
-          )..load(),
-        ),
+  void _loadInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+          _interstitialAd!.fullScreenContentCallback =
+              FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _loadInterstitialAd();
+            },
+            onAdFailedToShowFullScreenContent: (ad, error) {
+              ad.dispose();
+              _loadInterstitialAd();
+            },
+          );
+        },
+        onAdFailedToLoad: (err) {
+          _interstitialAd = null;
+        },
       ),
     );
   }
 
+  void _showInterstitialAd() {
+    _clickCount++;
+    if (_clickCount % 3 == 0 && _interstitialAd != null) {
+      _interstitialAd!.show();
+      _interstitialAd = null;
+      _loadInterstitialAd();
+    }
+  }
+
+  void _loadNativeAds() {
+    for (int i = 0; i < (hvacData.length / _adInterval).ceil(); i++) {
+      final nativeAd = NativeAd(
+        adUnitId: nativeAdUnitId,
+        factoryId: 'listTile',
+        request: const AdRequest(),
+        listener: NativeAdListener(
+          onAdLoaded: (ad) {
+            setState(() {
+              _nativeAds.add(ad as NativeAd);
+            });
+          },
+          onAdFailedToLoad: (ad, error) {
+            ad.dispose();
+          },
+        ),
+      );
+      nativeAd.load();
+    }
+  }
+
   @override
   void dispose() {
-    topBanner?.dispose();
-    bottomBanner?.dispose();
-    interstitialAd?.dispose();
+    _bannerAd?.dispose();
+    _interstitialAd?.dispose();
+    _searchController.dispose();
+    for (var ad in _nativeAds) {
+      ad.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> _launchUrl(String url) async {
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Cannot open: $url")),
+      );
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredHvacData {
+    return hvacData.where((item) {
+      final name = item["name"]?.toLowerCase() ?? '';
+      final address = item["address_full"]?.toLowerCase() ?? '';
+      final rating = double.tryParse(item["rating"] ?? '0.0') ?? 0.0;
+      final reviews = double.tryParse(item["reviews_count"] ?? '0') ?? 0.0;
+
+      final matchesSearch =
+          _searchText.isEmpty ||
+          name.contains(_searchText.toLowerCase()) ||
+          address.contains(_searchText.toLowerCase());
+
+      final matchesRating = rating >= _minRating && rating <= _maxRating;
+      final matchesReviews = reviews >= _minReviews && reviews <= _maxReviews;
+
+      return matchesSearch && matchesRating && matchesReviews;
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final items = <Widget>[];
-    for (int i = 0; i < filteredProducts.length; i++) {
-      items.add(ListTile(
-        title: Text(filteredProducts[i].name),
-        subtitle: Text(
-          "⭐ ${filteredProducts[i].rating} | ${filteredProducts[i].reviews} reviews",
-        ),
-        onTap: () {
-          clickCount++;
-          if (clickCount % 3 == 0) {
-            _showInterstitialAd();
-          }
-        },
-      ));
-
-      if ((i + 1) % 2 == 0) {
-        items.add(_buildNativeAd());
-      }
-    }
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Products with Ads"),
+        title: const Text("HVAC in Fort Worth"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () {
+              _showFilterDialog(context);
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
-          if (topBanner != null)
+          if (_bannerAd != null)
             SizedBox(
-              height: topBanner!.size.height.toDouble(),
-              child: AdWidget(ad: topBanner!),
+              width: _bannerAd!.size.width.toDouble(),
+              height: _bannerAd!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerAd!),
             ),
-          Expanded(
-            child: Column(
-              children: [
-                // Filter section
-                ExpansionTile(
-                  title: const Text("Filters"),
-                  children: [
-                    // Rating filter
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: List.generate(5, (i) {
-                        return ChoiceChip(
-                          label: Text("${i + 1} ⭐"),
-                          selected: minRating == (i + 1).toDouble(),
-                          onSelected: (sel) {
-                            setState(() {
-                              minRating = (i + 1).toDouble();
-                              maxRating = (i + 1).toDouble();
-                              _applyFilters();
-                            });
-                          },
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 12),
-                    // Reviews filter
-                    Column(
-                      children: [
-                        Text("Reviews: ${reviewRange.start.toInt()} - ${reviewRange.end.toInt()}"),
-                        RangeSlider(
-                          values: reviewRange,
-                          min: 0,
-                          max: maxReviews.toDouble(),
-                          divisions: 10,
-                          labels: RangeLabels(
-                            "${reviewRange.start.toInt()}",
-                            "${reviewRange.end.toInt()}",
-                          ),
-                          onChanged: (val) {
-                            setState(() {
-                              reviewRange = val;
-                              _applyFilters();
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Search by name or address',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
                 ),
-                Expanded(
-                  child: ListView(children: items),
+              ),
+            ),
+          ),
+
+          Expanded(
+            child: _filteredHvacData.isEmpty
+                ? const Center(child: Text('No data found.'))
+                : ListView.builder(
+                    itemCount: _filteredHvacData.length + _nativeAds.length,
+                    itemBuilder: (context, index) {
+                      final int dataIndex = index - (index ~/ _adInterval);
+
+                      if (index > 0 && index % _adInterval == 0) {
+                        final int adIndex = (index ~/ _adInterval) - 1;
+                        if (adIndex < _nativeAds.length) {
+                          return Container(
+                            margin: const EdgeInsets.symmetric(vertical: 10),
+                            height: 300,
+                            child: AdWidget(ad: _nativeAds[adIndex]),
+                          );
+                        } else {
+                          return const SizedBox.shrink();
+                        }
+                      } else if (dataIndex < _filteredHvacData.length) {
+                        final item = _filteredHvacData[dataIndex];
+                        final rating = item["rating"] ?? "N/A";
+                        final reviewsCount = item["reviews_count"] ?? "0";
+                        final phoneNumber = item["phone_number"] ?? "";
+                        final website = item["website"] ?? "";
+                        final mapUrl = item["map_url"] ?? "";
+
+                        return GestureDetector(
+                          onTap: () {
+                            _showInterstitialAd();
+                          },
+                          child: Card(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            elevation: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item["name"] ?? "No Name",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    item["address_full"] ??
+                                        "Address not available",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.star,
+                                        color: Colors.amber,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$rating ($reviewsCount reviews)',
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Wrap(
+                                    spacing: 8.0,
+                                    runSpacing: 4.0,
+                                    children: [
+                                      if (phoneNumber.isNotEmpty)
+                                        ActionChip(
+                                          avatar: const Icon(Icons.phone,
+                                              size: 18),
+                                          label: const Text('Call'),
+                                          onPressed: () =>
+                                              _launchUrl('tel:$phoneNumber'),
+                                        ),
+                                      if (website.isNotEmpty)
+                                        ActionChip(
+                                          avatar: const Icon(Icons.public,
+                                              size: 18),
+                                          label: const Text('Website'),
+                                          onPressed: () => _launchUrl(website),
+                                        ),
+                                      if (mapUrl.isNotEmpty)
+                                        ActionChip(
+                                          avatar: const Icon(Icons.map,
+                                              size: 18),
+                                          label: const Text('Map'),
+                                          onPressed: () => _launchUrl(mapUrl),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      } else {
+                        return const SizedBox.shrink();
+                      }
+                    },
+                  ),
+          ),
+
+          if (_bannerAd != null)
+            SizedBox(
+              width: _bannerAd!.size.width.toDouble(),
+              height: _bannerAd!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerAd!),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Filter Data'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Rating Range:'),
+                RangeSlider(
+                  values: RangeValues(_minRating, _maxRating),
+                  min: 0,
+                  max: 5,
+                  divisions: 5,
+                  labels: RangeLabels(
+                    _minRating.toStringAsFixed(1),
+                    _maxRating.toStringAsFixed(1),
+                  ),
+                  onChanged: (RangeValues values) {
+                    setState(() {
+                      _minRating = values.start;
+                      _maxRating = values.end;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text('Reviews Range:'),
+                RangeSlider(
+                  values: RangeValues(_minReviews, _maxReviews),
+                  min: 0,
+                  max: _maxReviews,
+                  divisions: 10,
+                  labels: RangeLabels(
+                    _minReviews.toStringAsFixed(0),
+                    _maxReviews.toStringAsFixed(0),
+                  ),
+                  onChanged: (RangeValues values) {
+                    setState(() {
+                      _minReviews = values.start;
+                      _maxReviews = values.end;
+                    });
+                  },
                 ),
               ],
             ),
           ),
-          if (bottomBanner != null)
-            SizedBox(
-              height: bottomBanner!.size.height.toDouble(),
-              child: AdWidget(ad: bottomBanner!),
+          actions: [
+            TextButton(
+              child: const Text('Apply'),
+              onPressed: () {
+                setState(() {});
+                Navigator.of(context).pop();
+              },
             ),
-        ],
-      ),
+            TextButton(
+              child: const Text('Reset'),
+              onPressed: () {
+                setState(() {
+                  _minRating = 0.0;
+                  _maxRating = 5.0;
+                  _minReviews = 0.0;
+                  _searchController.clear();
+                });
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
