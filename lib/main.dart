@@ -1,404 +1,254 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:url_launcher/url_launcher.dart';
-
-import 'flutter_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await MobileAds.instance.initialize();
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'HVAC in Fort Worth',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-        ),
-      ),
-      home: const HomePage(),
+      title: 'Product List with Ads',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: ProductListPage(),
     );
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class Product {
+  final String name;
+  final double rating;
+  final int reviews;
 
-  @override
-  State<HomePage> createState() => _HomePageState();
+  Product(this.name, this.rating, this.reviews);
 }
 
-class _HomePageState extends State<HomePage> {
-  // Ganti dengan unit ID milikmu di AdMob untuk produksi
-  final String bannerAdUnitId =
-      "ca-app-pub-3940256099942544/6300978111";
-  final String interstitialAdUnitId =
-      "ca-app-pub-3940256099942544/1033173712";
-  final String nativeAdUnitId =
-      "ca-app-pub-3940256099942544/2247696110";
+class ProductListPage extends StatefulWidget {
+  @override
+  State<ProductListPage> createState() => _ProductListPageState();
+}
 
-  BannerAd? _bannerAd;
-  InterstitialAd? _interstitialAd;
-  Timer? _interstitialTimer;
+class _ProductListPageState extends State<ProductListPage> {
+  List<Product> allProducts = List.generate(
+    30,
+    (i) => Product("Product $i", (i % 5 + 1).toDouble(), (i + 1) * 150),
+  );
+  List<Product> filteredProducts = [];
 
-  // Filter dan Pencarian
-  TextEditingController _searchController = TextEditingController();
-  String _searchText = '';
-  double _minRating = 0.0;
+  // Ads
+  BannerAd? topBanner;
+  BannerAd? bottomBanner;
+  InterstitialAd? interstitialAd;
+  AppOpenAd? appOpenAd;
 
-  // Native Ad related
-  final List<NativeAd> _nativeAds = [];
-  final int _adInterval = 5; // Tampilkan iklan setiap 5 item data
+  int clickCount = 0;
+  double minRating = 1;
+  double maxRating = 5;
+  RangeValues reviewRange = const RangeValues(0, 1000);
+  int maxReviews = 1000;
 
   @override
   void initState() {
     super.initState();
-    _loadBannerAd();
+    filteredProducts = List.from(allProducts);
+
+    // set max reviews dynamically
+    maxReviews = allProducts.map((p) => p.reviews).reduce((a, b) => a > b ? a : b);
+    reviewRange = RangeValues(0, maxReviews.toDouble());
+
+    _loadBannerAds();
     _loadInterstitialAd();
-    _loadNativeAds();
+    _loadAppOpenAd();
 
-    _interstitialTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
-      _showInterstitialAd();
-    });
-
-    _searchController.addListener(() {
-      setState(() {
-        _searchText = _searchController.text;
-      });
+    // show app open ad after delay
+    Future.delayed(const Duration(seconds: 3), () {
+      appOpenAd?.show();
     });
   }
 
-  void _loadBannerAd() {
-    _bannerAd = BannerAd(
-      adUnitId: bannerAdUnitId,
+  void _loadBannerAds() {
+    topBanner = BannerAd(
+      adUnitId: "ca-app-pub-6721734106426198/5259469376",
       size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) => debugPrint('BannerAd loaded.'),
-        onAdFailedToLoad: (ad, error) {
-          debugPrint('BannerAd failed to load: $error');
-          ad.dispose();
-        },
-      ),
+      request: AdRequest(),
+      listener: BannerAdListener(),
+    )..load();
+
+    bottomBanner = BannerAd(
+      adUnitId: "ca-app-pub-6721734106426198/5259469376",
+      size: AdSize.banner,
+      request: AdRequest(),
+      listener: BannerAdListener(),
     )..load();
   }
 
   void _loadInterstitialAd() {
     InterstitialAd.load(
-      adUnitId: interstitialAdUnitId,
-      request: const AdRequest(),
+      adUnitId: "ca-app-pub-6721734106426198/7710531994",
+      request: AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          debugPrint('InterstitialAd loaded.');
-          _interstitialAd = ad;
-          _interstitialAd!.fullScreenContentCallback =
-              FullScreenContentCallback(
-            onAdDismissedFullScreenContent: (ad) {
-              ad.dispose();
-              _loadInterstitialAd();
-            },
-            onAdFailedToShowFullScreenContent: (ad, error) {
-              debugPrint('InterstitialAd failed to show: $error');
-              ad.dispose();
-              _loadInterstitialAd();
-            },
-          );
-        },
-        onAdFailedToLoad: (error) => debugPrint("Interstitial failed: $error"),
+        onAdLoaded: (ad) => interstitialAd = ad,
+        onAdFailedToLoad: (err) => interstitialAd = null,
       ),
     );
   }
 
   void _showInterstitialAd() {
-    if (_interstitialAd != null) {
-      _interstitialAd!.show();
-    } else {
-      debugPrint('InterstitialAd not ready yet.');
+    if (interstitialAd != null) {
+      interstitialAd!.show();
+      interstitialAd = null;
+      _loadInterstitialAd(); // preload lagi
     }
   }
 
-  void _loadNativeAds() {
-    for (int i = 0; i < (hvacData.length / _adInterval).ceil(); i++) {
-      final nativeAd = NativeAd(
-        adUnitId: nativeAdUnitId,
-        factoryId: 'listTile',
-        request: const AdRequest(),
-        listener: NativeAdListener(
-          onAdLoaded: (ad) {
-            debugPrint('NativeAd loaded: ${ad.adUnitId}');
-            setState(() {
-              _nativeAds.add(ad as NativeAd);
-            });
-          },
-          onAdFailedToLoad: (ad, error) {
-            debugPrint('NativeAd failed to load: $error');
-            ad.dispose();
-          },
-        ),
-      );
-      nativeAd.load();
-    }
-  }
-
-  @override
-  void dispose() {
-    _bannerAd?.dispose();
-    _interstitialAd?.dispose();
-    _interstitialTimer?.cancel();
-    _searchController.dispose();
-    for (var ad in _nativeAds) {
-      ad.dispose();
-    }
-    super.dispose();
-  }
-
-  Future<void> _launchUrl(String url) async {
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Tidak bisa membuka: $url")));
-    }
-  }
-
-  List<Map<String, dynamic>> get _filteredHvacData {
-    return hvacData.where((item) {
-      final name = item["name"]?.toLowerCase() ?? '';
-      final address = item["address_full"]?.toLowerCase() ?? '';
-      final rating = double.tryParse(item["rating"] ?? '0.0') ?? 0.0;
-
-      final matchesSearch =
-          _searchText.isEmpty ||
-          name.contains(_searchText.toLowerCase()) ||
-          address.contains(_searchText.toLowerCase());
-
-      final matchesRating = rating >= _minRating;
-
-      return matchesSearch && matchesRating;
-    }).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("HVAC in Fort Worth"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () {
-              _showFilterDialog(context);
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Banner atas
-          if (_bannerAd != null)
-            SizedBox(
-              width: _bannerAd!.size.width.toDouble(),
-              height: _bannerAd!.size.height.toDouble(),
-              child: AdWidget(ad: _bannerAd!),
-            ),
-
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Cari berdasarkan nama atau alamat',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-              ),
-            ),
-          ),
-
-          Expanded(
-            child: _filteredHvacData.isEmpty
-                ? const Center(child: Text('Tidak ada data yang ditemukan.'))
-                : ListView.builder(
-                    itemCount:
-                        _filteredHvacData.length + (_nativeAds.length * 1),
-                    itemBuilder: (context, index) {
-                      final int dataIndex = index - (index ~/ _adInterval);
-
-                      if (index > 0 && index % _adInterval == 0) {
-                        final int adIndex = (index ~/ _adInterval) - 1;
-                        if (adIndex < _nativeAds.length) {
-                          return Container(
-                            margin: const EdgeInsets.symmetric(vertical: 10),
-                            height: 300,
-                            child: AdWidget(ad: _nativeAds[adIndex]),
-                          );
-                        } else {
-                          return const SizedBox.shrink();
-                        }
-                      } else if (dataIndex < _filteredHvacData.length) {
-                        final item = _filteredHvacData[dataIndex];
-                        final rating = item["rating"] ?? "N/A";
-                        final reviewsCount = item["reviews_count"] ?? "0";
-                        final phoneNumber = item["phone_number"] ?? "";
-                        final website = item["website"] ?? "";
-                        final mapUrl = item["map_url"] ?? "";
-
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          elevation: 2,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item["name"] ?? "No Name",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  item["address_full"] ?? "Alamat tidak tersedia",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700], // HAPUS const
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.star,
-                                      color: Colors.amber,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '$rating ($reviewsCount reviews)',
-                                      style: const TextStyle(fontSize: 14), // Bisa tetap const karena tidak pakai Colors.grey[xxx]
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 8.0,
-                                  runSpacing: 4.0,
-                                  children: [
-                                    if (phoneNumber.isNotEmpty)
-                                      ActionChip(
-                                        avatar: const Icon(
-                                          Icons.phone,
-                                          size: 18,
-                                        ),
-                                        label: const Text('Telepon'),
-                                        onPressed: () =>
-                                            _launchUrl('tel:$phoneNumber'),
-                                      ),
-                                    if (website.isNotEmpty)
-                                      ActionChip(
-                                        avatar: const Icon(
-                                          Icons.public,
-                                          size: 18,
-                                        ),
-                                        label: const Text('Website'),
-                                        onPressed: () => _launchUrl(website),
-                                      ),
-                                    if (mapUrl.isNotEmpty)
-                                      ActionChip(
-                                        avatar: const Icon(Icons.map, size: 18),
-                                        label: const Text('Peta'),
-                                        onPressed: () => _launchUrl(mapUrl),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      } else {
-                        return const SizedBox.shrink();
-                      }
-                    },
-                  ),
-          ),
-
-          // Banner bawah
-          if (_bannerAd != null)
-            SizedBox(
-              width: _bannerAd!.size.width.toDouble(),
-              height: _bannerAd!.size.height.toDouble(),
-              child: AdWidget(ad: _bannerAd!),
-            ),
-        ],
+  void _loadAppOpenAd() {
+    AppOpenAd.load(
+      adUnitId: "ca-app-pub-6721734106426198/2181490258",
+      orientation: AppOpenAd.orientationPortrait,
+      request: AdRequest(),
+      adLoadCallback: AppOpenAdLoadCallback(
+        onAdLoaded: (ad) => appOpenAd = ad,
+        onAdFailedToLoad: (err) => appOpenAd = null,
       ),
     );
   }
 
-  void _showFilterDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Filter Data'),
-          content: SingleChildScrollView(
+  void _applyFilters() {
+    setState(() {
+      filteredProducts = allProducts.where((p) {
+        return p.rating >= minRating &&
+            p.rating <= maxRating &&
+            p.reviews >= reviewRange.start &&
+            p.reviews <= reviewRange.end;
+      }).toList();
+    });
+  }
+
+  Widget _buildNativeAd() {
+    return Container(
+      margin: const EdgeInsets.all(8),
+      height: 120,
+      color: Colors.grey[200],
+      child: Center(
+        child: AdWidget(
+          ad: NativeAd(
+            adUnitId: "ca-app-pub-6721734106426198/6120735266",
+            factoryId: 'listTile',
+            request: AdRequest(),
+            listener: NativeAdListener(),
+          )..load(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    topBanner?.dispose();
+    bottomBanner?.dispose();
+    interstitialAd?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <Widget>[];
+    for (int i = 0; i < filteredProducts.length; i++) {
+      items.add(ListTile(
+        title: Text(filteredProducts[i].name),
+        subtitle: Text(
+          "⭐ ${filteredProducts[i].rating} | ${filteredProducts[i].reviews} reviews",
+        ),
+        onTap: () {
+          clickCount++;
+          if (clickCount % 3 == 0) {
+            _showInterstitialAd();
+          }
+        },
+      ));
+
+      if ((i + 1) % 2 == 0) {
+        items.add(_buildNativeAd());
+      }
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Products with Ads"),
+      ),
+      body: Column(
+        children: [
+          if (topBanner != null)
+            SizedBox(
+              height: topBanner!.size.height.toDouble(),
+              child: AdWidget(ad: topBanner!),
+            ),
+          Expanded(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Rating Minimal:'),
-                Slider(
-                  value: _minRating,
-                  min: 0.0,
-                  max: 5.0,
-                  divisions: 10,
-                  label: _minRating.toStringAsFixed(1),
-                  onChanged: (double value) {
-                    setState(() {
-                      _minRating = value;
-                    });
-                  },
+                // Filter section
+                ExpansionTile(
+                  title: const Text("Filters"),
+                  children: [
+                    // Rating filter
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: List.generate(5, (i) {
+                        return ChoiceChip(
+                          label: Text("${i + 1} ⭐"),
+                          selected: minRating == (i + 1).toDouble(),
+                          onSelected: (sel) {
+                            setState(() {
+                              minRating = (i + 1).toDouble();
+                              maxRating = (i + 1).toDouble();
+                              _applyFilters();
+                            });
+                          },
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    // Reviews filter
+                    Column(
+                      children: [
+                        Text("Reviews: ${reviewRange.start.toInt()} - ${reviewRange.end.toInt()}"),
+                        RangeSlider(
+                          values: reviewRange,
+                          min: 0,
+                          max: maxReviews.toDouble(),
+                          divisions: 10,
+                          labels: RangeLabels(
+                            "${reviewRange.start.toInt()}",
+                            "${reviewRange.end.toInt()}",
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              reviewRange = val;
+                              _applyFilters();
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                Text('Rating: ${_minRating.toStringAsFixed(1)} ke atas'),
+                Expanded(
+                  child: ListView(children: items),
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              child: const Text('Terapkan'),
-              onPressed: () {
-                setState(() {}); // Trigger rebuild with new filter
-                Navigator.of(context).pop();
-              },
+          if (bottomBanner != null)
+            SizedBox(
+              height: bottomBanner!.size.height.toDouble(),
+              child: AdWidget(ad: bottomBanner!),
             ),
-            TextButton(
-              child: const Text('Reset'),
-              onPressed: () {
-                setState(() {
-                  _minRating = 0.0;
-                  _searchController.clear();
-                });
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
