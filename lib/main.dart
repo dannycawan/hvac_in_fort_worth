@@ -39,7 +39,7 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
@@ -54,7 +54,7 @@ class _HomePageState extends State<HomePage> {
   int _clickCount = 0;
 
   // Search & Filter
-  TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
   double _minRating = 0.0;
   double _maxRating = 5.0;
@@ -189,7 +189,7 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Future<void> _launchUrl(String url) async {
+  Future _launchUrl(String url) async {
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } else {
@@ -206,11 +206,9 @@ class _HomePageState extends State<HomePage> {
       final rating = double.tryParse(item["rating"] ?? '0.0') ?? 0.0;
       final reviews = double.tryParse(item["reviews_count"] ?? '0') ?? 0.0;
 
-      final matchesSearch =
-          _searchText.isEmpty ||
+      final matchesSearch = _searchText.isEmpty ||
           name.contains(_searchText.toLowerCase()) ||
           address.contains(_searchText.toLowerCase());
-
       final matchesRating = rating >= _minRating && rating <= _maxRating;
       final matchesReviews = reviews >= _minReviews && reviews <= _maxReviews;
 
@@ -234,6 +232,7 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
+          // Banner Top
           if (_bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
@@ -241,6 +240,7 @@ class _HomePageState extends State<HomePage> {
               child: AdWidget(ad: _bannerAd!),
             ),
 
+          // Search
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -255,13 +255,16 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
+          // HVAC List + Native Ads every 2 listings
           Expanded(
             child: _filteredHvacData.isEmpty
                 ? const Center(child: Text('No data found.'))
                 : ListView.builder(
-                    itemCount: _filteredHvacData.length + _nativeAds.length,
+                    itemCount:
+                        _filteredHvacData.length + _nativeAds.length,
                     itemBuilder: (context, index) {
-                      final int dataIndex = index - (index ~/ _adInterval);
+                      final int dataIndex =
+                          index - (index ~/ _adInterval);
 
                       if (index > 0 && index % _adInterval == 0) {
                         final int adIndex = (index ~/ _adInterval) - 1;
@@ -295,7 +298,8 @@ class _HomePageState extends State<HomePage> {
                             child: Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     item["name"] ?? "No Name",
@@ -324,7 +328,8 @@ class _HomePageState extends State<HomePage> {
                                       const SizedBox(width: 4),
                                       Text(
                                         '$rating ($reviewsCount reviews)',
-                                        style: const TextStyle(fontSize: 14),
+                                        style: const TextStyle(
+                                            fontSize: 14),
                                       ),
                                     ],
                                   ),
@@ -346,14 +351,16 @@ class _HomePageState extends State<HomePage> {
                                           avatar: const Icon(Icons.public,
                                               size: 18),
                                           label: const Text('Website'),
-                                          onPressed: () => _launchUrl(website),
+                                          onPressed: () =>
+                                              _launchUrl(website),
                                         ),
                                       if (mapUrl.isNotEmpty)
                                         ActionChip(
                                           avatar: const Icon(Icons.map,
                                               size: 18),
                                           label: const Text('Map'),
-                                          onPressed: () => _launchUrl(mapUrl),
+                                          onPressed: () =>
+                                              _launchUrl(mapUrl),
                                         ),
                                     ],
                                   ),
@@ -369,6 +376,7 @@ class _HomePageState extends State<HomePage> {
                   ),
           ),
 
+          // Banner Bottom
           if (_bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
