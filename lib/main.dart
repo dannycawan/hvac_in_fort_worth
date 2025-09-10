@@ -1,46 +1,3 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'flutter_data.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await MobileAds.instance.initialize();
-  runApp(const MyApp());
-}
-
-/// Global App Open Ad reference
-AppOpenAd? appOpenAd;
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'HVAC in Fort Worth',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-        ),
-      ),
-      home: const HomePage(),
-    );
-  }
-}
-
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  State createState() => _HomePageState();
-}
-
 class _HomePageState extends State<HomePage> {
   // Ad Unit IDs
   final String bannerAdUnitId = "ca-app-pub-6721734106426198/5259469376";
@@ -52,7 +9,6 @@ class _HomePageState extends State<HomePage> {
   InterstitialAd? _interstitialAd;
   int _clickCount = 0;
 
-  // Search & Filter
   final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
   double _minRating = 0.0;
@@ -60,7 +16,6 @@ class _HomePageState extends State<HomePage> {
   double _minReviews = 0.0;
   double _maxReviews = 1000.0;
 
-  // Native ads
   final List<NativeAd> _nativeAds = [];
   final int _adInterval = 2; // every 2 listings
 
@@ -72,11 +27,10 @@ class _HomePageState extends State<HomePage> {
     _loadNativeAds();
     _loadAppOpenAd();
 
-    // Delay App Open Ad 3 seconds once
     Future.delayed(const Duration(seconds: 3), () {
       if (appOpenAd != null) {
         appOpenAd!.show();
-        appOpenAd = null; // only show once per session
+        appOpenAd = null;
       }
     });
 
@@ -86,12 +40,22 @@ class _HomePageState extends State<HomePage> {
       });
     });
 
-    // Dynamic max reviews from data
     final reviews = hvacData
         .map((item) => double.tryParse(item["reviews_count"] ?? '0') ?? 0)
         .toList();
     if (reviews.isNotEmpty) {
       _maxReviews = reviews.reduce((a, b) => a > b ? a : b);
+    }
+  }
+
+  /// Membersihkan nomor telepon jadi format +1XXXXXXXXXX
+  String formatPhoneNumber(String rawNumber) {
+    String digitsOnly = rawNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.length >= 10) {
+      String last10 = digitsOnly.substring(digitsOnly.length - 10);
+      return '+1$last10';
+    } else {
+      return rawNumber; // nomor pendek tetap dikembalikan apa adanya
     }
   }
 
@@ -229,15 +193,12 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // Banner Top
           if (_bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
               height: _bannerAd!.size.height.toDouble(),
               child: AdWidget(ad: _bannerAd!),
             ),
-
-          // Search
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -251,8 +212,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-
-          // HVAC List + Native Ads every 2 listings
           Expanded(
             child: _filteredHvacData.isEmpty
                 ? const Center(child: Text('No data found.'))
@@ -278,14 +237,12 @@ class _HomePageState extends State<HomePage> {
                         final item = _filteredHvacData[dataIndex];
                         final rating = item["rating"] ?? "N/A";
                         final reviewsCount = item["reviews_count"] ?? "0";
-                        final phoneNumber = item["phone_number"] ?? "";
+                        final phoneNumber = formatPhoneNumber(item["phone_number"] ?? "");
                         final website = item["website"] ?? "";
                         final mapUrl = item["map_url"] ?? "";
 
                         return GestureDetector(
-                          onTap: () {
-                            _showInterstitialAd();
-                          },
+                          onTap: () => _showInterstitialAd(),
                           child: Card(
                             margin: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -372,8 +329,6 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
           ),
-
-          // Banner Bottom
           if (_bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
