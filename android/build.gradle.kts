@@ -1,30 +1,64 @@
 plugins {
-    // Android Gradle Plugin
-    id("com.android.application") version "8.7.3" apply false
-
-    // Kotlin Android → jangan hardcode versi, biar pakai bawaan Flutter SDK
-    id("org.jetbrains.kotlin.android") apply false
-
-    // Tidak pakai Firebase → google-services tidak perlu
+    id("com.android.application")
+    id("kotlin-android")
+    // Flutter Gradle Plugin harus terakhir
+    id("dev.flutter.flutter-gradle-plugin")
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
+android {
+    namespace = "com.hvac.fortworth"
+    compileSdk = 35
+    ndkVersion = "27.0.12077973" // sesuai kebutuhan dependency
+
+    defaultConfig {
+        applicationId = "com.hvac.fortworth"
+        minSdk = 21
+        targetSdk = 35
+        versionCode = 1
+        versionName = "1.0.0"
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("debug") // ganti dengan release signing sebelum upload
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*"
+            )
+        }
     }
 }
 
-// Custom build dir biar lebih rapi
-val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
-rootProject.layout.buildDirectory.value(newBuildDir)
-
-subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
-    project.evaluationDependsOn(":app")
+flutter {
+    source = "../.."
 }
 
-tasks.register<Delete>("clean") {
-    delete(rootProject.layout.buildDirectory)
+dependencies {
+    // AdMob SDK
+    implementation("com.google.android.gms:play-services-ads:23.1.0")
 }
