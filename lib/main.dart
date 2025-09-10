@@ -15,6 +15,7 @@ AppOpenAd? appOpenAd;
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -35,11 +36,13 @@ class MyApp extends StatelessWidget {
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
   @override
   State createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage> {
+  // Ad Unit IDs
   final String bannerAdUnitId = "ca-app-pub-6721734106426198/5259469376";
   final String interstitialAdUnitId = "ca-app-pub-6721734106426198/7710531994";
   final String nativeAdUnitId = "ca-app-pub-6721734106426198/6120735266";
@@ -49,60 +52,46 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   InterstitialAd? _interstitialAd;
   int _clickCount = 0;
 
+  // Search & Filter
   final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
   double _minRating = 0.0;
   double _maxRating = 5.0;
   double _minReviews = 0.0;
-  double _maxReviews = 1000.0; // max tetap dari data
+  double _maxReviews = 1000.0;
 
-  late final double _maxReviewsData;
-
+  // Native ads
   final List<NativeAd> _nativeAds = [];
-  final int _adInterval = 2;
+  final int _adInterval = 2; // every 2 listings
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-
-    // Hitung maxReviews dari data
-    final reviews = hvacData
-        .map((item) => double.tryParse(item["reviews_count"] ?? '0') ?? 0)
-        .toList();
-    _maxReviewsData =
-        reviews.isNotEmpty ? reviews.reduce((a, b) => a > b ? a : b) : 1000;
-    _maxReviews = _maxReviewsData;
-
     _loadBannerAd();
     _loadInterstitialAd();
     _loadNativeAds();
     _loadAppOpenAd();
+
+    // Delay App Open Ad 3 seconds once
+    Future.delayed(const Duration(seconds: 3), () {
+      if (appOpenAd != null) {
+        appOpenAd!.show();
+        appOpenAd = null; // only show once per session
+      }
+    });
 
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text;
       });
     });
-  }
 
-  @override
-  void dispose() {
-    _bannerAd?.dispose();
-    _interstitialAd?.dispose();
-    _searchController.dispose();
-    for (var ad in _nativeAds) ad.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Tampilkan AppOpenAd saat app kembali aktif
-    if (state == AppLifecycleState.resumed && appOpenAd != null) {
-      appOpenAd!.show();
-      appOpenAd = null;
-      _loadAppOpenAd();
+    // Dynamic max reviews from data
+    final reviews = hvacData
+        .map((item) => double.tryParse(item["reviews_count"] ?? '0') ?? 0)
+        .toList();
+    if (reviews.isNotEmpty) {
+      _maxReviews = reviews.reduce((a, b) => a > b ? a : b);
     }
   }
 
@@ -114,7 +103,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         onAdLoaded: (ad) => appOpenAd = ad,
         onAdFailedToLoad: (err) => appOpenAd = null,
       ),
-      orientation: AppOpenAd.orientationPortrait,
     );
   }
 
@@ -124,7 +112,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
-        onAdLoaded: (ad) => setState(() {}),
+        onAdLoaded: (ad) => debugPrint('Banner loaded'),
         onAdFailedToLoad: (ad, error) {
           ad.dispose();
           debugPrint('Banner failed: $error');
@@ -169,8 +157,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _loadNativeAds() {
-    // Muat hanya 3 native ad pertama saja
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < (hvacData.length / _adInterval).ceil(); i++) {
       final nativeAd = NativeAd(
         adUnitId: nativeAdUnitId,
         factoryId: 'listTile',
@@ -190,10 +177,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    _interstitialAd?.dispose();
+    _searchController.dispose();
+    for (var ad in _nativeAds) {
+      ad.dispose();
+    }
+    super.dispose();
+  }
+
+  Future _launchUrl(String url) async {
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Cannot open: $url")),
@@ -232,12 +229,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
+          // Banner Top
           if (_bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
               height: _bannerAd!.size.height.toDouble(),
               child: AdWidget(ad: _bannerAd!),
             ),
+
+          // Search
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -251,13 +251,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ),
           ),
+
+          // HVAC List + Native Ads every 2 listings
           Expanded(
             child: _filteredHvacData.isEmpty
                 ? const Center(child: Text('No data found.'))
                 : ListView.builder(
-                    itemCount: _filteredHvacData.length + _nativeAds.length,
+                    itemCount:
+                        _filteredHvacData.length + _nativeAds.length,
                     itemBuilder: (context, index) {
-                      final int dataIndex = index - (index ~/ _adInterval);
+                      final int dataIndex =
+                          index - (index ~/ _adInterval);
 
                       if (index > 0 && index % _adInterval == 0) {
                         final int adIndex = (index ~/ _adInterval) - 1;
@@ -279,7 +283,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         final mapUrl = item["map_url"] ?? "";
 
                         return GestureDetector(
-                          onTap: _showInterstitialAd,
+                          onTap: () {
+                            _showInterstitialAd();
+                          },
                           child: Card(
                             margin: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -289,7 +295,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             child: Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     item["name"] ?? "No Name",
@@ -300,7 +307,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    item["address_full"] ?? "Address not available",
+                                    item["address_full"] ??
+                                        "Address not available",
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey[700],
@@ -309,12 +317,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      const Icon(Icons.star,
-                                          color: Colors.amber, size: 18),
+                                      const Icon(
+                                        Icons.star,
+                                        color: Colors.amber,
+                                        size: 18,
+                                      ),
                                       const SizedBox(width: 4),
                                       Text(
                                         '$rating ($reviewsCount reviews)',
-                                        style: const TextStyle(fontSize: 14),
+                                        style: const TextStyle(
+                                            fontSize: 14),
                                       ),
                                     ],
                                   ),
@@ -325,22 +337,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     children: [
                                       if (phoneNumber.isNotEmpty)
                                         ActionChip(
-                                          avatar: const Icon(Icons.phone, size: 18),
+                                          avatar: const Icon(Icons.phone,
+                                              size: 18),
                                           label: const Text('Call'),
                                           onPressed: () =>
                                               _launchUrl('tel:$phoneNumber'),
                                         ),
                                       if (website.isNotEmpty)
                                         ActionChip(
-                                          avatar: const Icon(Icons.public, size: 18),
+                                          avatar: const Icon(Icons.public,
+                                              size: 18),
                                           label: const Text('Website'),
-                                          onPressed: () => _launchUrl(website),
+                                          onPressed: () =>
+                                              _launchUrl(website),
                                         ),
                                       if (mapUrl.isNotEmpty)
                                         ActionChip(
-                                          avatar: const Icon(Icons.map, size: 18),
+                                          avatar: const Icon(Icons.map,
+                                              size: 18),
                                           label: const Text('Map'),
-                                          onPressed: () => _launchUrl(mapUrl),
+                                          onPressed: () =>
+                                              _launchUrl(mapUrl),
                                         ),
                                     ],
                                   ),
@@ -355,6 +372,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     },
                   ),
           ),
+
+          // Banner Bottom
           if (_bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
@@ -398,7 +417,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 RangeSlider(
                   values: RangeValues(_minReviews, _maxReviews),
                   min: 0,
-                  max: _maxReviewsData,
+                  max: _maxReviews,
                   divisions: 10,
                   labels: RangeLabels(
                     _minReviews.toStringAsFixed(0),
@@ -429,7 +448,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   _minRating = 0.0;
                   _maxRating = 5.0;
                   _minReviews = 0.0;
-                  _maxReviews = _maxReviewsData;
                   _searchController.clear();
                 });
                 Navigator.of(context).pop();
