@@ -39,7 +39,7 @@ class HomePage extends StatefulWidget {
   State createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final String bannerAdUnitId = "ca-app-pub-6721734106426198/5259469376";
   final String interstitialAdUnitId = "ca-app-pub-6721734106426198/7710531994";
   final String nativeAdUnitId = "ca-app-pub-6721734106426198/6120735266";
@@ -54,37 +54,56 @@ class _HomePageState extends State<HomePage> {
   double _minRating = 0.0;
   double _maxRating = 5.0;
   double _minReviews = 0.0;
-  double _maxReviews = 1000.0;
+  double _maxReviews = 1000.0; // max tetap dari data
+
+  late final double _maxReviewsData;
 
   final List<NativeAd> _nativeAds = [];
-  final int _adInterval = 2; // every 2 listings
+  final int _adInterval = 2;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Hitung maxReviews dari data
+    final reviews = hvacData
+        .map((item) => double.tryParse(item["reviews_count"] ?? '0') ?? 0)
+        .toList();
+    _maxReviewsData =
+        reviews.isNotEmpty ? reviews.reduce((a, b) => a > b ? a : b) : 1000;
+    _maxReviews = _maxReviewsData;
+
     _loadBannerAd();
     _loadInterstitialAd();
     _loadNativeAds();
     _loadAppOpenAd();
-
-    // Show App Open Ad once after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (appOpenAd != null) {
-        appOpenAd!.show();
-        appOpenAd = null;
-      }
-    });
 
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text;
       });
     });
+  }
 
-    final reviews = hvacData
-        .map((item) => double.tryParse(item["reviews_count"] ?? '0') ?? 0)
-        .toList();
-    if (reviews.isNotEmpty) _maxReviews = reviews.reduce((a, b) => a > b ? a : b);
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    _interstitialAd?.dispose();
+    _searchController.dispose();
+    for (var ad in _nativeAds) ad.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Tampilkan AppOpenAd saat app kembali aktif
+    if (state == AppLifecycleState.resumed && appOpenAd != null) {
+      appOpenAd!.show();
+      appOpenAd = null;
+      _loadAppOpenAd();
+    }
   }
 
   void _loadAppOpenAd() {
@@ -95,6 +114,7 @@ class _HomePageState extends State<HomePage> {
         onAdLoaded: (ad) => appOpenAd = ad,
         onAdFailedToLoad: (err) => appOpenAd = null,
       ),
+      orientation: AppOpenAd.orientationPortrait,
     );
   }
 
@@ -104,7 +124,7 @@ class _HomePageState extends State<HomePage> {
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
-        onAdLoaded: (ad) => debugPrint('Banner loaded'),
+        onAdLoaded: (ad) => setState(() {}),
         onAdFailedToLoad: (ad, error) {
           ad.dispose();
           debugPrint('Banner failed: $error');
@@ -149,7 +169,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _loadNativeAds() {
-    for (int i = 0; i < (hvacData.length / _adInterval).ceil(); i++) {
+    // Muat hanya 3 native ad pertama saja
+    for (int i = 0; i < 3; i++) {
       final nativeAd = NativeAd(
         adUnitId: nativeAdUnitId,
         factoryId: 'listTile',
@@ -169,18 +190,10 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  @override
-  void dispose() {
-    _bannerAd?.dispose();
-    _interstitialAd?.dispose();
-    _searchController.dispose();
-    for (var ad in _nativeAds) ad.dispose();
-    super.dispose();
-  }
-
-  Future _launchUrl(String url) async {
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Cannot open: $url")),
@@ -287,8 +300,7 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    item["address_full"] ??
-                                        "Address not available",
+                                    item["address_full"] ?? "Address not available",
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey[700],
@@ -302,8 +314,7 @@ class _HomePageState extends State<HomePage> {
                                       const SizedBox(width: 4),
                                       Text(
                                         '$rating ($reviewsCount reviews)',
-                                        style:
-                                            const TextStyle(fontSize: 14),
+                                        style: const TextStyle(fontSize: 14),
                                       ),
                                     ],
                                   ),
@@ -314,27 +325,22 @@ class _HomePageState extends State<HomePage> {
                                     children: [
                                       if (phoneNumber.isNotEmpty)
                                         ActionChip(
-                                          avatar:
-                                              const Icon(Icons.phone, size: 18),
+                                          avatar: const Icon(Icons.phone, size: 18),
                                           label: const Text('Call'),
                                           onPressed: () =>
                                               _launchUrl('tel:$phoneNumber'),
                                         ),
                                       if (website.isNotEmpty)
                                         ActionChip(
-                                          avatar: const Icon(Icons.public,
-                                              size: 18),
+                                          avatar: const Icon(Icons.public, size: 18),
                                           label: const Text('Website'),
-                                          onPressed: () =>
-                                              _launchUrl(website),
+                                          onPressed: () => _launchUrl(website),
                                         ),
                                       if (mapUrl.isNotEmpty)
                                         ActionChip(
-                                          avatar: const Icon(Icons.map,
-                                              size: 18),
+                                          avatar: const Icon(Icons.map, size: 18),
                                           label: const Text('Map'),
-                                          onPressed: () =>
-                                              _launchUrl(mapUrl),
+                                          onPressed: () => _launchUrl(mapUrl),
                                         ),
                                     ],
                                   ),
@@ -354,3 +360,84 @@ class _HomePageState extends State<HomePage> {
               width: _bannerAd!.size.width.toDouble(),
               height: _bannerAd!.size.height.toDouble(),
               child: AdWidget(ad: _bannerAd!),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Filter Data'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Rating Range:'),
+                RangeSlider(
+                  values: RangeValues(_minRating, _maxRating),
+                  min: 0,
+                  max: 5,
+                  divisions: 5,
+                  labels: RangeLabels(
+                    _minRating.toStringAsFixed(1),
+                    _maxRating.toStringAsFixed(1),
+                  ),
+                  onChanged: (RangeValues values) {
+                    setState(() {
+                      _minRating = values.start;
+                      _maxRating = values.end;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text('Reviews Range:'),
+                RangeSlider(
+                  values: RangeValues(_minReviews, _maxReviews),
+                  min: 0,
+                  max: _maxReviewsData,
+                  divisions: 10,
+                  labels: RangeLabels(
+                    _minReviews.toStringAsFixed(0),
+                    _maxReviews.toStringAsFixed(0),
+                  ),
+                  onChanged: (RangeValues values) {
+                    setState(() {
+                      _minReviews = values.start;
+                      _maxReviews = values.end;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Apply'),
+              onPressed: () {
+                setState(() {});
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Reset'),
+              onPressed: () {
+                setState(() {
+                  _minRating = 0.0;
+                  _maxRating = 5.0;
+                  _minReviews = 0.0;
+                  _maxReviews = _maxReviewsData;
+                  _searchController.clear();
+                });
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
