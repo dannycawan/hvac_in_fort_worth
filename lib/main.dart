@@ -1,3 +1,46 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'flutter_data.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await MobileAds.instance.initialize();
+  runApp(const MyApp());
+}
+
+/// Global App Open Ad reference
+AppOpenAd? appOpenAd;
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'HVAC in Fort Worth',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      home: const HomePage(),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
 class _HomePageState extends State<HomePage> {
   // Ad Unit IDs
   final String bannerAdUnitId = "ca-app-pub-6721734106426198/5259469376";
@@ -9,6 +52,7 @@ class _HomePageState extends State<HomePage> {
   InterstitialAd? _interstitialAd;
   int _clickCount = 0;
 
+  // Search & Filter
   final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
   double _minRating = 0.0;
@@ -16,6 +60,7 @@ class _HomePageState extends State<HomePage> {
   double _minReviews = 0.0;
   double _maxReviews = 1000.0;
 
+  // Native ads
   final List<NativeAd> _nativeAds = [];
   final int _adInterval = 2; // every 2 listings
 
@@ -27,10 +72,11 @@ class _HomePageState extends State<HomePage> {
     _loadNativeAds();
     _loadAppOpenAd();
 
+    // Delay App Open Ad 3 seconds once
     Future.delayed(const Duration(seconds: 3), () {
       if (appOpenAd != null) {
         appOpenAd!.show();
-        appOpenAd = null;
+        appOpenAd = null; // only show once per session
       }
     });
 
@@ -40,6 +86,7 @@ class _HomePageState extends State<HomePage> {
       });
     });
 
+    // Dynamic max reviews from data
     final reviews = hvacData
         .map((item) => double.tryParse(item["reviews_count"] ?? '0') ?? 0)
         .toList();
@@ -48,21 +95,11 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Membersihkan nomor telepon jadi format +1XXXXXXXXXX
-  String formatPhoneNumber(String rawNumber) {
-    String digitsOnly = rawNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digitsOnly.length >= 10) {
-      String last10 = digitsOnly.substring(digitsOnly.length - 10);
-      return '+1$last10';
-    } else {
-      return rawNumber; // nomor pendek tetap dikembalikan apa adanya
-    }
-  }
-
   void _loadAppOpenAd() {
     AppOpenAd.load(
       adUnitId: appOpenAdUnitId,
       request: const AdRequest(),
+      orientation: AppOpenAd.orientationPortrait,
       adLoadCallback: AppOpenAdLoadCallback(
         onAdLoaded: (ad) => appOpenAd = ad,
         onAdFailedToLoad: (err) => appOpenAd = null,
@@ -152,6 +189,7 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  /// Launch URL (tel, web, maps)
   Future _launchUrl(String url) async {
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -160,6 +198,15 @@ class _HomePageState extends State<HomePage> {
         SnackBar(content: Text("Cannot open: $url")),
       );
     }
+  }
+
+  /// Fix phone number: +1 + remove brackets/spaces
+  String _normalizePhoneNumber(String number) {
+    String cleaned = number.replaceAll(RegExp(r'[\(\)\s\-]'), '');
+    if (!cleaned.startsWith('+1')) {
+      cleaned = '+1$cleaned';
+    }
+    return cleaned;
   }
 
   List<Map<String, dynamic>> get _filteredHvacData {
@@ -193,12 +240,15 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
+          // Banner Top
           if (_bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
               height: _bannerAd!.size.height.toDouble(),
               child: AdWidget(ad: _bannerAd!),
             ),
+
+          // Search
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -212,6 +262,8 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
+
+          // HVAC List + Native Ads every 2 listings
           Expanded(
             child: _filteredHvacData.isEmpty
                 ? const Center(child: Text('No data found.'))
@@ -237,23 +289,19 @@ class _HomePageState extends State<HomePage> {
                         final item = _filteredHvacData[dataIndex];
                         final rating = item["rating"] ?? "N/A";
                         final reviewsCount = item["reviews_count"] ?? "0";
-                        final phoneNumber = formatPhoneNumber(item["phone_number"] ?? "");
+                        final phoneNumber = _normalizePhoneNumber(item["phone_number"] ?? "");
                         final website = item["website"] ?? "";
                         final mapUrl = item["map_url"] ?? "";
 
                         return GestureDetector(
-                          onTap: () => _showInterstitialAd(),
+                          onTap: _showInterstitialAd,
                           child: Card(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
+                            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             elevation: 2,
                             child: Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     item["name"] ?? "No Name",
@@ -264,8 +312,7 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    item["address_full"] ??
-                                        "Address not available",
+                                    item["address_full"] ?? "Address not available",
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey[700],
@@ -274,17 +321,9 @@ class _HomePageState extends State<HomePage> {
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      const Icon(
-                                        Icons.star,
-                                        color: Colors.amber,
-                                        size: 18,
-                                      ),
+                                      const Icon(Icons.star, color: Colors.amber, size: 18),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        '$rating ($reviewsCount reviews)',
-                                        style: const TextStyle(
-                                            fontSize: 14),
-                                      ),
+                                      Text('$rating ($reviewsCount reviews)', style: const TextStyle(fontSize: 14)),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
@@ -294,27 +333,21 @@ class _HomePageState extends State<HomePage> {
                                     children: [
                                       if (phoneNumber.isNotEmpty)
                                         ActionChip(
-                                          avatar: const Icon(Icons.phone,
-                                              size: 18),
+                                          avatar: const Icon(Icons.phone, size: 18),
                                           label: const Text('Call'),
-                                          onPressed: () =>
-                                              _launchUrl('tel:$phoneNumber'),
+                                          onPressed: () => _launchUrl('tel:$phoneNumber'),
                                         ),
                                       if (website.isNotEmpty)
                                         ActionChip(
-                                          avatar: const Icon(Icons.public,
-                                              size: 18),
+                                          avatar: const Icon(Icons.public, size: 18),
                                           label: const Text('Website'),
-                                          onPressed: () =>
-                                              _launchUrl(website),
+                                          onPressed: () => _launchUrl(website),
                                         ),
                                       if (mapUrl.isNotEmpty)
                                         ActionChip(
-                                          avatar: const Icon(Icons.map,
-                                              size: 18),
+                                          avatar: const Icon(Icons.map, size: 18),
                                           label: const Text('Map'),
-                                          onPressed: () =>
-                                              _launchUrl(mapUrl),
+                                          onPressed: () => _launchUrl(mapUrl),
                                         ),
                                     ],
                                   ),
@@ -329,6 +362,8 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
           ),
+
+          // Banner Bottom
           if (_bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
