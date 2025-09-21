@@ -48,7 +48,10 @@ class _HomePageState extends State<HomePage> {
   final String nativeAdUnitId = "ca-app-pub-6721734106426198/6120735266";
   final String appOpenAdUnitId = "ca-app-pub-6721734106426198/2181490258";
 
-  BannerAd? _bannerAd;
+  BannerAd? _bannerAd1;
+  BannerAd? _bannerAd2;
+  BannerAd? _bannerAd3;
+  BannerAd? _bannerAd4;
   InterstitialAd? _interstitialAd;
   int _clickCount = 0;
 
@@ -67,7 +70,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadBannerAd();
+    _loadBanners();
     _loadInterstitialAd();
     _loadNativeAds();
     _loadAppOpenAd();
@@ -106,8 +109,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _loadBannerAd() {
-    _bannerAd = BannerAd(
+  void _loadBanners() {
+    _bannerAd1 = _createBanner();
+    _bannerAd2 = _createBanner();
+    _bannerAd3 = _createBanner();
+    _bannerAd4 = _createBanner();
+  }
+
+  BannerAd _createBanner() {
+    return BannerAd(
       adUnitId: bannerAdUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
@@ -179,7 +189,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _bannerAd?.dispose();
+    _bannerAd1?.dispose();
+    _bannerAd2?.dispose();
+    _bannerAd3?.dispose();
+    _bannerAd4?.dispose();
     _interstitialAd?.dispose();
     _searchController.dispose();
     for (var ad in _nativeAds) {
@@ -188,12 +201,35 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  // Normalisasi nomor telepon ke format +1xxx
+  String normalizePhone(String phone) {
+    // Hapus semua karakter selain angka
+    String digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return phone;
+    if (digits.startsWith('1')) {
+      return '+$digits';
+    }
+    return '+1$digits';
+  }
+
   Future _launchUrl(String url) async {
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Cannot open: $url")),
+      );
+    }
+  }
+
+  Future<void> _makePhoneCall(String phone) async {
+    final normalized = normalizePhone(phone);
+    final Uri launchUri = Uri(scheme: 'tel', path: normalized);
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Cannot call: $normalized")),
       );
     }
   }
@@ -215,6 +251,26 @@ class _HomePageState extends State<HomePage> {
     }).toList();
   }
 
+  Widget _bannerRow(BannerAd? ad1, BannerAd? ad2) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        if (ad1 != null)
+          SizedBox(
+            width: ad1.size.width.toDouble(),
+            height: ad1.size.height.toDouble(),
+            child: AdWidget(ad: ad1),
+          ),
+        if (ad2 != null)
+          SizedBox(
+            width: ad2.size.width.toDouble(),
+            height: ad2.size.height.toDouble(),
+            child: AdWidget(ad: ad2),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -229,13 +285,8 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // Banner Top
-          if (_bannerAd != null)
-            SizedBox(
-              width: _bannerAd!.size.width.toDouble(),
-              height: _bannerAd!.size.height.toDouble(),
-              child: AdWidget(ad: _bannerAd!),
-            ),
+          // 2 Banner Top
+          _bannerRow(_bannerAd1, _bannerAd2),
 
           // Search
           Padding(
@@ -252,7 +303,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // HVAC List + Native Ads every 2 listings
+          // HVAC List + Native Ads
           Expanded(
             child: _filteredHvacData.isEmpty
                 ? const Center(child: Text('No data found.'))
@@ -281,6 +332,8 @@ class _HomePageState extends State<HomePage> {
                         final phoneNumber = item["phone_number"] ?? "";
                         final website = item["website"] ?? "";
                         final mapUrl = item["map_url"] ?? "";
+                        final normalizedPhone =
+                            phoneNumber.isNotEmpty ? normalizePhone(phoneNumber) : "";
 
                         return GestureDetector(
                           onTap: () {
@@ -339,9 +392,10 @@ class _HomePageState extends State<HomePage> {
                                         ActionChip(
                                           avatar: const Icon(Icons.phone,
                                               size: 18),
-                                          label: const Text('Call'),
+                                          label: Text(
+                                              'Call $normalizedPhone'),
                                           onPressed: () =>
-                                              _launchUrl('tel:$phoneNumber'),
+                                              _makePhoneCall(phoneNumber),
                                         ),
                                       if (website.isNotEmpty)
                                         ActionChip(
@@ -373,13 +427,8 @@ class _HomePageState extends State<HomePage> {
                   ),
           ),
 
-          // Banner Bottom
-          if (_bannerAd != null)
-            SizedBox(
-              width: _bannerAd!.size.width.toDouble(),
-              height: _bannerAd!.size.height.toDouble(),
-              child: AdWidget(ad: _bannerAd!),
-            ),
+          // 2 Banner Bottom
+          _bannerRow(_bannerAd3, _bannerAd4),
         ],
       ),
     );
