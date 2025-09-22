@@ -48,8 +48,10 @@ class _HomePageState extends State<HomePage> {
   final String nativeAdUnitId = "ca-app-pub-6721734106426198/6120735266";
   final String appOpenAdUnitId = "ca-app-pub-6721734106426198/2181490258";
 
+  // Banner Ads
   BannerAd? _bannerTop1;
   BannerAd? _bannerTop2;
+  BannerAd? _bannerTop3;
   BannerAd? _bannerBottom1;
   BannerAd? _bannerBottom2;
 
@@ -71,7 +73,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadBannerAds();
+    _loadAllBanners();
     _loadInterstitialAd();
     _loadNativeAds();
     _loadAppOpenAd();
@@ -99,6 +101,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Normalisasi nomor telepon → hapus spasi, tanda kurung, tambahkan +1
+  String normalizePhone(String raw) {
+    String cleaned = raw.replaceAll(RegExp(r'[^\d]'), '');
+    if (!cleaned.startsWith('1')) {
+      cleaned = '1$cleaned';
+    }
+    return '+$cleaned';
+  }
+
   void _loadAppOpenAd() {
     AppOpenAd.load(
       adUnitId: appOpenAdUnitId,
@@ -110,58 +121,28 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _loadBannerAds() {
-    _bannerTop1 = BannerAd(
-      adUnitId: bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) => debugPrint('BannerTop1 loaded'),
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-          debugPrint('BannerTop1 failed: $error');
-        },
-      ),
-    )..load();
+  void _loadAllBanners() {
+    _bannerTop1 = _createBanner();
+    _bannerTop2 = _createBanner();
+    _bannerTop3 = _createBanner();
+    _bannerBottom1 = _createBanner();
+    _bannerBottom2 = _createBanner();
+  }
 
-    _bannerTop2 = BannerAd(
+  BannerAd _createBanner() {
+    final banner = BannerAd(
       adUnitId: bannerAdUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
-        onAdLoaded: (ad) => debugPrint('BannerTop2 loaded'),
+        onAdLoaded: (ad) => debugPrint('Banner loaded'),
         onAdFailedToLoad: (ad, error) {
           ad.dispose();
-          debugPrint('BannerTop2 failed: $error');
+          debugPrint('Banner failed: $error');
         },
       ),
     )..load();
-
-    _bannerBottom1 = BannerAd(
-      adUnitId: bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) => debugPrint('BannerBottom1 loaded'),
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-          debugPrint('BannerBottom1 failed: $error');
-        },
-      ),
-    )..load();
-
-    _bannerBottom2 = BannerAd(
-      adUnitId: bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) => debugPrint('BannerBottom2 loaded'),
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-          debugPrint('BannerBottom2 failed: $error');
-        },
-      ),
-    )..load();
+    return banner;
   }
 
   void _loadInterstitialAd() {
@@ -224,6 +205,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _bannerTop1?.dispose();
     _bannerTop2?.dispose();
+    _bannerTop3?.dispose();
     _bannerBottom1?.dispose();
     _bannerBottom2?.dispose();
     _interstitialAd?.dispose();
@@ -235,11 +217,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future _launchUrl(String url) async {
-    if (url.startsWith('tel:')) {
-      // normalisasi nomor
-      String number = url.replaceAll(RegExp(r'[^0-9+]'), '');
-      url = 'tel:$number';
-    }
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } else {
@@ -280,7 +257,7 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // BannerTop1
+          // Banner Top1
           if (_bannerTop1 != null)
             SizedBox(
               width: _bannerTop1!.size.width.toDouble(),
@@ -303,7 +280,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // BannerTop2
+          // Banner Top2
           if (_bannerTop2 != null)
             SizedBox(
               width: _bannerTop2!.size.width.toDouble(),
@@ -311,28 +288,24 @@ class _HomePageState extends State<HomePage> {
               child: AdWidget(ad: _bannerTop2!),
             ),
 
-          // HVAC List + Native Ads every 2 listings + BannerBottom1
+          // Banner Top3 (before list)
+          if (_bannerTop3 != null)
+            SizedBox(
+              width: _bannerTop3!.size.width.toDouble(),
+              height: _bannerTop3!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerTop3!),
+            ),
+
+          // HVAC List + Native Ads every 2 listings
           Expanded(
             child: _filteredHvacData.isEmpty
                 ? const Center(child: Text('No data found.'))
                 : ListView.builder(
                     itemCount:
-                        _filteredHvacData.length + _nativeAds.length + 1, // +1 for bottom banner1
+                        _filteredHvacData.length + _nativeAds.length,
                     itemBuilder: (context, index) {
-                      // Show BannerBottom1 before last item
-                      if (index == _filteredHvacData.length + _nativeAds.length) {
-                        if (_bannerBottom1 != null) {
-                          return SizedBox(
-                            width: _bannerBottom1!.size.width.toDouble(),
-                            height: _bannerBottom1!.size.height.toDouble(),
-                            child: AdWidget(ad: _bannerBottom1!),
-                          );
-                        } else {
-                          return const SizedBox.shrink();
-                        }
-                      }
-
-                      final int dataIndex = index - (index ~/ _adInterval);
+                      final int dataIndex =
+                          index - (index ~/ _adInterval);
 
                       if (index > 0 && index % _adInterval == 0) {
                         final int adIndex = (index ~/ _adInterval) - 1;
@@ -396,8 +369,7 @@ class _HomePageState extends State<HomePage> {
                                       const SizedBox(width: 4),
                                       Text(
                                         '$rating ($reviewsCount reviews)',
-                                        style: const TextStyle(
-                                            fontSize: 14),
+                                        style: const TextStyle(fontSize: 14),
                                       ),
                                     ],
                                   ),
@@ -411,8 +383,11 @@ class _HomePageState extends State<HomePage> {
                                           avatar: const Icon(Icons.phone,
                                               size: 18),
                                           label: const Text('Call'),
-                                          onPressed: () =>
-                                              _launchUrl('tel:$phoneNumber'),
+                                          onPressed: () {
+                                            final normalized =
+                                                normalizePhone(phoneNumber);
+                                            _launchUrl('tel:$normalized');
+                                          },
                                         ),
                                       if (website.isNotEmpty)
                                         ActionChip(
@@ -444,7 +419,15 @@ class _HomePageState extends State<HomePage> {
                   ),
           ),
 
-          // BannerBottom2 paling bawah
+          // Banner Bottom1
+          if (_bannerBottom1 != null)
+            SizedBox(
+              width: _bannerBottom1!.size.width.toDouble(),
+              height: _bannerBottom1!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerBottom1!),
+            ),
+
+          // Banner Bottom2
           if (_bannerBottom2 != null)
             SizedBox(
               width: _bannerBottom2!.size.width.toDouble(),
