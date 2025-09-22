@@ -48,10 +48,11 @@ class _HomePageState extends State<HomePage> {
   final String nativeAdUnitId = "ca-app-pub-6721734106426198/6120735266";
   final String appOpenAdUnitId = "ca-app-pub-6721734106426198/2181490258";
 
-  BannerAd? _bannerAd1;
-  BannerAd? _bannerAd2;
-  BannerAd? _bannerAd3;
-  BannerAd? _bannerAd4;
+  BannerAd? _bannerTop1;
+  BannerAd? _bannerTop2;
+  BannerAd? _bannerBottom1;
+  BannerAd? _bannerBottom2;
+
   InterstitialAd? _interstitialAd;
   int _clickCount = 0;
 
@@ -70,7 +71,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadBanners();
+    _loadBannerAds();
     _loadInterstitialAd();
     _loadNativeAds();
     _loadAppOpenAd();
@@ -109,23 +110,55 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _loadBanners() {
-    _bannerAd1 = _createBanner();
-    _bannerAd2 = _createBanner();
-    _bannerAd3 = _createBanner();
-    _bannerAd4 = _createBanner();
-  }
-
-  BannerAd _createBanner() {
-    return BannerAd(
+  void _loadBannerAds() {
+    _bannerTop1 = BannerAd(
       adUnitId: bannerAdUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
-        onAdLoaded: (ad) => debugPrint('Banner loaded'),
+        onAdLoaded: (ad) => debugPrint('BannerTop1 loaded'),
         onAdFailedToLoad: (ad, error) {
           ad.dispose();
-          debugPrint('Banner failed: $error');
+          debugPrint('BannerTop1 failed: $error');
+        },
+      ),
+    )..load();
+
+    _bannerTop2 = BannerAd(
+      adUnitId: bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) => debugPrint('BannerTop2 loaded'),
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          debugPrint('BannerTop2 failed: $error');
+        },
+      ),
+    )..load();
+
+    _bannerBottom1 = BannerAd(
+      adUnitId: bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) => debugPrint('BannerBottom1 loaded'),
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          debugPrint('BannerBottom1 failed: $error');
+        },
+      ),
+    )..load();
+
+    _bannerBottom2 = BannerAd(
+      adUnitId: bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) => debugPrint('BannerBottom2 loaded'),
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          debugPrint('BannerBottom2 failed: $error');
         },
       ),
     )..load();
@@ -189,10 +222,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _bannerAd1?.dispose();
-    _bannerAd2?.dispose();
-    _bannerAd3?.dispose();
-    _bannerAd4?.dispose();
+    _bannerTop1?.dispose();
+    _bannerTop2?.dispose();
+    _bannerBottom1?.dispose();
+    _bannerBottom2?.dispose();
     _interstitialAd?.dispose();
     _searchController.dispose();
     for (var ad in _nativeAds) {
@@ -201,35 +234,17 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // Normalisasi nomor telepon ke format +1xxx
-  String normalizePhone(String phone) {
-    // Hapus semua karakter selain angka
-    String digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) return phone;
-    if (digits.startsWith('1')) {
-      return '+$digits';
-    }
-    return '+1$digits';
-  }
-
   Future _launchUrl(String url) async {
+    if (url.startsWith('tel:')) {
+      // normalisasi nomor
+      String number = url.replaceAll(RegExp(r'[^0-9+]'), '');
+      url = 'tel:$number';
+    }
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Cannot open: $url")),
-      );
-    }
-  }
-
-  Future<void> _makePhoneCall(String phone) async {
-    final normalized = normalizePhone(phone);
-    final Uri launchUri = Uri(scheme: 'tel', path: normalized);
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Cannot call: $normalized")),
       );
     }
   }
@@ -251,26 +266,6 @@ class _HomePageState extends State<HomePage> {
     }).toList();
   }
 
-  Widget _bannerRow(BannerAd? ad1, BannerAd? ad2) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        if (ad1 != null)
-          SizedBox(
-            width: ad1.size.width.toDouble(),
-            height: ad1.size.height.toDouble(),
-            child: AdWidget(ad: ad1),
-          ),
-        if (ad2 != null)
-          SizedBox(
-            width: ad2.size.width.toDouble(),
-            height: ad2.size.height.toDouble(),
-            child: AdWidget(ad: ad2),
-          ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -285,8 +280,13 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // 2 Banner Top
-          _bannerRow(_bannerAd1, _bannerAd2),
+          // BannerTop1
+          if (_bannerTop1 != null)
+            SizedBox(
+              width: _bannerTop1!.size.width.toDouble(),
+              height: _bannerTop1!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerTop1!),
+            ),
 
           // Search
           Padding(
@@ -303,16 +303,36 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // HVAC List + Native Ads
+          // BannerTop2
+          if (_bannerTop2 != null)
+            SizedBox(
+              width: _bannerTop2!.size.width.toDouble(),
+              height: _bannerTop2!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerTop2!),
+            ),
+
+          // HVAC List + Native Ads every 2 listings + BannerBottom1
           Expanded(
             child: _filteredHvacData.isEmpty
                 ? const Center(child: Text('No data found.'))
                 : ListView.builder(
                     itemCount:
-                        _filteredHvacData.length + _nativeAds.length,
+                        _filteredHvacData.length + _nativeAds.length + 1, // +1 for bottom banner1
                     itemBuilder: (context, index) {
-                      final int dataIndex =
-                          index - (index ~/ _adInterval);
+                      // Show BannerBottom1 before last item
+                      if (index == _filteredHvacData.length + _nativeAds.length) {
+                        if (_bannerBottom1 != null) {
+                          return SizedBox(
+                            width: _bannerBottom1!.size.width.toDouble(),
+                            height: _bannerBottom1!.size.height.toDouble(),
+                            child: AdWidget(ad: _bannerBottom1!),
+                          );
+                        } else {
+                          return const SizedBox.shrink();
+                        }
+                      }
+
+                      final int dataIndex = index - (index ~/ _adInterval);
 
                       if (index > 0 && index % _adInterval == 0) {
                         final int adIndex = (index ~/ _adInterval) - 1;
@@ -332,8 +352,6 @@ class _HomePageState extends State<HomePage> {
                         final phoneNumber = item["phone_number"] ?? "";
                         final website = item["website"] ?? "";
                         final mapUrl = item["map_url"] ?? "";
-                        final normalizedPhone =
-                            phoneNumber.isNotEmpty ? normalizePhone(phoneNumber) : "";
 
                         return GestureDetector(
                           onTap: () {
@@ -392,10 +410,9 @@ class _HomePageState extends State<HomePage> {
                                         ActionChip(
                                           avatar: const Icon(Icons.phone,
                                               size: 18),
-                                          label: Text(
-                                              'Call $normalizedPhone'),
+                                          label: const Text('Call'),
                                           onPressed: () =>
-                                              _makePhoneCall(phoneNumber),
+                                              _launchUrl('tel:$phoneNumber'),
                                         ),
                                       if (website.isNotEmpty)
                                         ActionChip(
@@ -427,8 +444,13 @@ class _HomePageState extends State<HomePage> {
                   ),
           ),
 
-          // 2 Banner Bottom
-          _bannerRow(_bannerAd3, _bannerAd4),
+          // BannerBottom2 paling bawah
+          if (_bannerBottom2 != null)
+            SizedBox(
+              width: _bannerBottom2!.size.width.toDouble(),
+              height: _bannerBottom2!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerBottom2!),
+            ),
         ],
       ),
     );
