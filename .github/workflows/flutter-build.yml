@@ -4,60 +4,91 @@ on:
   push:
     branches:
       - main
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build APK & AAB
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    env:
+      KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      - name: Setup Flutter (latest stable)
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.0'
           channel: stable
+          cache: true
 
-      - name: Decode keystore
+      - name: Install dependencies
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/my-release-key.keystore
+          flutter pub get
+          flutter pub run flutter_launcher_icons:main
 
-      - name: Create key.properties
+      - name: Verify Flutter version
+        run: flutter --version
+
+      - name: Decode and secure keystore
         run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/my-release-key.keystore
+          chmod 600 android/app/my-release-key.keystore
           echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=my-release-key.keystore" >> android/key.properties
 
-      - name: Cache Flutter Pub
-        uses: actions/cache@v3
-        with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
-      - name: Get dependencies
-        run: flutter pub get
-
       - name: Build APK (release)
-        run: flutter build apk --release
+        run: |
+          flutter clean
+          flutter build apk --release --verbose | tee flutter_build_apk.log
 
       - name: Build AAB (release)
-        run: flutter build appbundle --release
+        run: |
+          flutter build appbundle --release --verbose | tee flutter_build_aab.log
 
-      - name: List build outputs
-        run: ls -R build/app/outputs
-
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hvac-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          name: app-release-${{ github.run_number }}.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
 
-      - name: Upload AAB
+      - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hvac-aab
-          path: build/app/outputs/bundle/release/*.aab
+          name: app-release-${{ github.run_number }}.aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 7
+
+      - name: Upload native debug symbols (if exists)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lib-symbols-${{ github.run_number }}
+          path: build/app/intermediates/merged_native_libs/release/out/lib.symbols
+          if-no-files-found: ignore
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.run_number }}
+          path: |
+            flutter_build_apk.log
+            flutter_build_aab.log
+          if-no-files-found: ignore
