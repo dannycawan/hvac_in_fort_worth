@@ -12,22 +12,25 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
+      # 1. Checkout source code
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # 2. Setup Java (required for Android build)
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      # 3. Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -35,14 +38,17 @@ jobs:
           channel: stable
           cache: true
 
+      # 4. Install dependencies & launcher icons
       - name: Install dependencies
         run: |
           flutter pub get
           flutter pub run flutter_launcher_icons:main || echo "No launcher icons configured"
 
+      # 5. Verify Flutter version
       - name: Verify Flutter version
         run: flutter --version
 
+      # 6. Decode keystore dan buat key.properties
       - name: Decode and secure keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/my-release-key.keystore
@@ -52,18 +58,22 @@ jobs:
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=my-release-key.keystore" >> android/key.properties
 
+      # 7. Build APK release
       - name: Build APK (release)
         run: |
           flutter clean
           flutter build apk --release --verbose | tee flutter_build_apk.log
 
+      # 8. Build AAB release
       - name: Build AAB (release)
         run: |
           flutter build appbundle --release --verbose | tee flutter_build_aab.log
 
+      # 9. List all build outputs
       - name: List build outputs
         run: ls -R build/app/outputs
 
+      # 10. Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -71,6 +81,7 @@ jobs:
           path: build/app/outputs/flutter-apk/*.apk
           retention-days: 7
 
+      # 11. Upload AAB artifact
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
@@ -78,7 +89,8 @@ jobs:
           path: build/app/outputs/bundle/release/*.aab
           retention-days: 7
 
-      - name: Upload native debug symbols (if exists)
+      # 12. Upload native debug symbols (if exists)
+      - name: Upload native debug symbols
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -86,6 +98,7 @@ jobs:
           path: build/app/intermediates/merged_native_libs/release/out/lib.symbols
           if-no-files-found: ignore
 
+      # 13. Upload build logs
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
