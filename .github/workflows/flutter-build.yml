@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: |
           flutter pub get
-          flutter pub run flutter_launcher_icons:main
+          flutter pub run flutter_launcher_icons:main || echo "No launcher icons configured"
 
       - name: Verify Flutter version
         run: flutter --version
@@ -61,18 +61,21 @@ jobs:
         run: |
           flutter build appbundle --release --verbose | tee flutter_build_aab.log
 
+      - name: List build outputs
+        run: ls -R build/app/outputs
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}.apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*.apk
           retention-days: 7
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}.aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: build/app/outputs/bundle/release/*.aab
           retention-days: 7
 
       - name: Upload native debug symbols (if exists)
