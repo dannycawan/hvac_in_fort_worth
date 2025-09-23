@@ -17,13 +17,13 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
-      # 1. Checkout source code
-      - name: Checkout source code
+      # 1. Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Setup Java (required for Android build)
+      # 2. Setup Java (untuk Android build)
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
@@ -48,9 +48,10 @@ jobs:
       - name: Verify Flutter version
         run: flutter --version
 
-      # 6. Decode keystore dan buat key.properties
+      # 6. Decode keystore & buat key.properties
       - name: Decode and secure keystore
         run: |
+          mkdir -p android/app
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/my-release-key.keystore
           chmod 600 android/app/my-release-key.keystore
           echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
@@ -69,9 +70,14 @@ jobs:
         run: |
           flutter build appbundle --release --verbose | tee flutter_build_aab.log
 
-      # 9. List all build outputs
-      - name: List build outputs
-        run: ls -R build/app/outputs
+      # 9. List APK & AAB outputs (tidak error jika folder kosong)
+      - name: List APK output
+        run: |
+          ls -R build/app/outputs/flutter-apk || echo "APK folder not found"
+
+      - name: List AAB output
+        run: |
+          ls -R build/app/outputs/bundle/release || echo "AAB folder not found"
 
       # 10. Upload APK artifact
       - name: Upload APK artifact
@@ -89,7 +95,7 @@ jobs:
           path: build/app/outputs/bundle/release/*.aab
           retention-days: 7
 
-      # 12. Upload native debug symbols (if exists)
+      # 12. Upload native debug symbols (jika ada)
       - name: Upload native debug symbols
         if: always()
         uses: actions/upload-artifact@v4
