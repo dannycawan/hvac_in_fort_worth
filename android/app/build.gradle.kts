@@ -30,10 +30,27 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        // Load key.properties (jika ada)
+        def keystorePropertiesFile = rootProject.file("android/key.properties")
+        if (keystorePropertiesFile.exists()) {
+            def keystoreProperties = new Properties()
+            keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
+            create("release") {
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: ganti dengan signingConfig release sebelum upload ke Play Store
-            signingConfig = signingConfigs.getByName("debug")
+            // Pakai release keystore kalau tersedia, kalau tidak fallback ke debug
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+
             // sementara biar build cepat & stabil
             isMinifyEnabled = false
             isShrinkResources = false

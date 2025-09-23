@@ -36,5 +36,19 @@ dev_dependencies:
   # Linter untuk jaga kualitas kode
   flutter_lints: ^5.0.0
 
+  # Launcher icons generator
+  flutter_launcher_icons: ^0.11.0
+
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/icon/app_icon.png
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  # Optional: adaptive icons for Android (background color)
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
