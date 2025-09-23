@@ -14,11 +14,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Upgrade Flutter versi yang mendukung Dart >=3.6
-      - name: Setup Flutter
+      - name: Setup Flutter (latest stable)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.25.0'  # versi baru untuk Dart 3.6+
+          channel: stable
 
       - name: Decode keystore
         run: |
@@ -35,7 +34,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pub-
 
