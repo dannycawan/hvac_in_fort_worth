@@ -1,12 +1,21 @@
+// android/build.gradle (root)
+
 buildscript {
     repositories {
-        google()
-        mavenCentral()
+        google()       // Repository resmi Android
+        mavenCentral() // Repository Maven umum
+        // Optional: Flutter plugin kadang butuh jitpack
+        maven { url "https://jitpack.io" }
     }
 
     dependencies {
+        // Android Gradle Plugin versi stabil terbaru untuk AGP 8.1
         classpath "com.android.tools.build:gradle:8.1.0"
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0"
+
+        // Kotlin Gradle Plugin (pastikan versi sesuai Gradle dan Kotlin yang digunakan)
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0"
+
+        // Flutter Gradle Plugin, versi stable cukup tanpa nomor versi
         classpath "dev.flutter:flutter-gradle-plugin"
     }
 }
@@ -15,5 +24,12 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Optional: tambahkan jika ada dependency dari jitpack
+        maven { url "https://jitpack.io" }
     }
+}
+
+// Opsional untuk properti global
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
 }

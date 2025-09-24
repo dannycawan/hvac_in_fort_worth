@@ -1,3 +1,5 @@
+// android/app/build.gradle
+
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
@@ -10,8 +12,8 @@ android {
 
     defaultConfig {
         applicationId "com.hvac.fortworth"
-        minSdk 21
-        targetSdk 35
+        minSdk 21           // Minimal SDK, versi ideal agar support banyak device
+        targetSdk 35        // Target SDK terbaru (Android 14 / API 35)
         versionCode 1
         versionName "1.0"
 
@@ -57,7 +59,10 @@ android {
 
     packagingOptions {
         resources {
-            excludes += ["META-INF/LICENSE*", "META-INF/NOTICE*"]
+            excludes += [
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*"
+            ]
         }
     }
 }
@@ -67,5 +72,6 @@ flutter {
 }
 
 dependencies {
+    // AdMob SDK
     implementation "com.google.android.gms:play-services-ads:23.1.0"
 }
