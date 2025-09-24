@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
@@ -14,34 +13,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.27.0"
+          flutter-version: '3.27.0'
+          channel: 'stable'
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Decode keystore
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-key.jks
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
       - name: Update versionCode & versionName
         run: |
           if [ -f android/app/build.gradle ]; then
-            sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
-            sed -i "s/versionName \".*\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
-            echo "✅ Updated versionCode=${{ github.run_number }} versionName=1.0.${{ github.run_number }}"
+            sed -i "s/versionCode [0-9]*/versionCode 94/" android/app/build.gradle
+            sed -i "s/versionName \".*\"/versionName \"1.0.94\"/" android/app/build.gradle
+            echo "✅ Updated versionCode=94 versionName=1.0.94"
           else
             echo "❌ android/app/build.gradle not found!"
             exit 1
           fi
 
-      - name: Decode keystore
+      - name: Flutter clean & get
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/my-release-key.jks
+          flutter clean
+          flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
@@ -52,11 +50,11 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
+          name: flutter-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: release-aab
+          name: bundle-release
           path: build/app/outputs/bundle/release/app-release.aab
