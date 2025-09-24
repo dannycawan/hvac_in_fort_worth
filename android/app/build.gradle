@@ -1,14 +1,12 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
-    // Flutter Gradle Plugin harus terakhir
     id "dev.flutter.flutter-gradle-plugin"
 }
 
 android {
     namespace "com.hvac.fortworth"
-    compileSdk flutter.compileSdkVersion
-    // Hapus ndkVersion karena tidak dibutuhkan kalau tidak pakai native libs
+    compileSdk 34
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
@@ -21,12 +19,10 @@ android {
 
     defaultConfig {
         applicationId "com.hvac.fortworth"
-        minSdk flutter.minSdkVersion
-        targetSdk flutter.targetSdkVersion
-        versionCode flutter.versionCode
-        versionName flutter.versionName
-
-        // opsional: agar tidak crash karena WebView di Android 11+
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -36,7 +32,7 @@ android {
             def keystoreProperties = new Properties()
             keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 
-            release {
+            create("release") {
                 storeFile file(keystoreProperties["storeFile"])
                 storePassword keystoreProperties["storePassword"]
                 keyAlias keystoreProperties["keyAlias"]
@@ -47,16 +43,12 @@ android {
 
     buildTypes {
         release {
-            // Pakai release keystore kalau tersedia, fallback ke debug
             signingConfig signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
-
-            // sementara biar build cepat & stabil
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
         debug {
-            // opsional, supaya debug lebih gampang
             applicationIdSuffix ".debug"
             versionNameSuffix "-debug"
         }
@@ -64,10 +56,7 @@ android {
 
     packagingOptions {
         resources {
-            excludes += [
-                "META-INF/LICENSE*",
-                "META-INF/NOTICE*"
-            ]
+            excludes += ["META-INF/LICENSE*", "META-INF/NOTICE*"]
         }
     }
 }
@@ -77,6 +66,5 @@ flutter {
 }
 
 dependencies {
-    // AdMob SDK
     implementation "com.google.android.gms:play-services-ads:23.1.0"
 }

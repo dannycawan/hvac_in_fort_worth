@@ -15,11 +15,14 @@ jobs:
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
     steps:
       # 1. Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # 2. Setup Java
       - name: Setup Java
@@ -34,53 +37,54 @@ jobs:
         with:
           flutter-version: '3.27.0'
           channel: stable
+          cache: true
 
       # 4. Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
       # 5. Decode keystore & buat key.properties
-      - name: Decode keystore
+      - name: Decode and secure keystore
         run: |
           mkdir -p android/app
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/my-release-key.keystore
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/my-release-key.keystore
           chmod 600 android/app/my-release-key.keystore
-          echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
-          echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
+          echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" > android/key.properties
+          echo "keyPassword=$ANDROID_KEY_PASSWORD" >> android/key.properties
+          echo "keyAlias=$ANDROID_KEY_ALIAS" >> android/key.properties
           echo "storeFile=my-release-key.keystore" >> android/key.properties
 
-      # 6. Update versionCode & versionName
-      - name: Update version
+      # 6. Update versionCode & versionName otomatis
+      - name: Update versionCode & versionName
         run: |
-          if [ -f android/app/build.gradle ]; then
-            sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
-            sed -i "s/versionName \".*\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
-            echo "✅ Updated versionCode=${{ github.run_number }} versionName=1.0.${{ github.run_number }}"
-          else
-            echo "❌ android/app/build.gradle not found!"
-            exit 1
-          fi
+          sed -i "s/versionCode [0-9]\+/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \".*\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+          echo "✅ Updated versionCode=${{ github.run_number }} versionName=1.0.${{ github.run_number }}"
 
-      # 7. Build APK & AAB
-      - name: Build APK & AAB
+      # 7. Build APK release
+      - name: Build APK (release)
         run: |
           flutter clean
           flutter build apk --release
-          flutter build appbundle --release
 
-      # 8. Upload APK
-      - name: Upload APK
+      # 8. Build AAB release
+      - name: Build AAB (release)
+        run: flutter build appbundle --release
+
+      # 9. Upload APK artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}.apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          retention-days: 7
 
-      # 9. Upload AAB
-      - name: Upload AAB
+      # 10. Upload AAB artifact
+      - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}.aab
           path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+          retention-days: 7

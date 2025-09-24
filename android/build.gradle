@@ -1,69 +1,27 @@
-name: Flutter Build
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
-on:
-  push:
-    branches:
-      - main
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.1.0"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0"
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.0'
-          channel: 'stable'
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
 
-      - name: Decode keystore
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-
-      - name: Create key.properties
-        run: |
-          cat > android/key.properties <<EOF
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          storeFile=upload-keystore.jks
-          EOF
-
-      - name: Update versionCode & versionName
-        run: |
-          if [ -f android/app/build.gradle ]; then
-            sed -i "s/versionCode [0-9]*/versionCode 94/" android/app/build.gradle
-            sed -i "s/versionName \".*\"/versionName \"1.0.94\"/" android/app/build.gradle
-            echo "✅ Updated versionCode=94 versionName=1.0.94"
-          else
-            echo "❌ android/app/build.gradle not found!"
-            exit 1
-          fi
-
-      - name: Flutter clean & get
-        run: |
-          flutter clean
-          flutter pub get
-
-      - name: Build APK
-        run: flutter build apk --release
-
-      - name: Build AAB
-        run: flutter build appbundle --release
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: flutter-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: bundle-release
-          path: build/app/outputs/bundle/release/app-release.aab
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
