@@ -17,21 +17,13 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
-      # 1. Checkout repo
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 🔍 Debug: list struktur folder
-      - name: Debug list repo structure
-        run: |
-          echo "=== Root Repo Structure ==="
-          ls -R | head -n 200
-          echo "=== android/app Structure ==="
-          ls -R android/app || echo "android/app not found"
-
-      # 2. Setup Java (untuk Android build)
+      # 2. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
@@ -46,17 +38,26 @@ jobs:
           channel: stable
           cache: true
 
-      # 4. Install dependencies & launcher icons
+      # 4. Cache Flutter & Gradle dependencies
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
+
+      # 5. Install dependencies & launcher icons
       - name: Install dependencies
         run: |
           flutter pub get
           flutter pub run flutter_launcher_icons:main || echo "No launcher icons configured"
 
-      # 5. Verify Flutter version
+      # 6. Verify Flutter version
       - name: Verify Flutter version
         run: flutter --version
 
-      # 6. Decode keystore & buat key.properties
+      # 7. Decode keystore & buat key.properties
       - name: Decode and secure keystore
         run: |
           mkdir -p android/app
@@ -65,49 +66,50 @@ jobs:
           echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=my-release-key.keystore" >> android/key.properties
+          echo "storeFile=app/my-release-key.keystore" >> android/key.properties
 
-      # 🔍 Debug: update versionCode & versionName
+      # 8. Update versionCode & versionName di build.gradle.kts
       - name: Update versionCode & versionName
         run: |
-          if [ -f android/app/build.gradle ]; then
-            sed -i "s/versionCode [0-9]*/versionCode 85/" android/app/build.gradle
-            sed -i "s/versionName \".*\"/versionName \"1.0.85\"/" android/app/build.gradle
+          FILE=android/app/build.gradle.kts
+          if [ -f "$FILE" ]; then
+            sed -i "s/versionCode [0-9]*/versionCode 85/" "$FILE"
+            sed -i "s/versionName \".*\"/versionName \"1.0.85\"/" "$FILE"
             echo "✅ Updated versionCode=85 versionName=1.0.85"
           else
-            echo "❌ android/app/build.gradle not found!"
+            echo "❌ $FILE not found!"
             exit 1
           fi
 
-      # 7. Build APK release
+      # 9. Build APK (release)
       - name: Build APK (release)
         run: |
+          set -e
           flutter clean
           flutter build apk --release --verbose | tee flutter_build_apk.log
 
-      # 8. Build AAB release
+      # 10. Build AAB (release)
       - name: Build AAB (release)
         run: |
+          set -e
           flutter build appbundle --release --verbose | tee flutter_build_aab.log
 
-      # 9. List APK & AAB outputs (tidak error jika folder kosong)
+      # 11. List APK & AAB outputs
       - name: List APK output
-        run: |
-          ls -R build/app/outputs/flutter-apk || echo "APK folder not found"
+        run: ls -R build/app/outputs/flutter-apk || echo "APK folder not found"
 
       - name: List AAB output
-        run: |
-          ls -R build/app/outputs/bundle/release || echo "AAB folder not found"
+        run: ls -R build/app/outputs/bundle/release || echo "AAB folder not found"
 
-      # 10. Upload APK artifact
+      # 12. Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}.apk
-          path: build/app/outputs/flutter-apk/*.apk
+          path: build/app/outputs/flutter-apk/app-release*.apk
           retention-days: 7
 
-      # 11. Upload AAB artifact
+      # 13. Upload AAB artifact
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
@@ -115,7 +117,7 @@ jobs:
           path: build/app/outputs/bundle/release/*.aab
           retention-days: 7
 
-      # 12. Upload native debug symbols (jika ada)
+      # 14. Upload native debug symbols (jika ada)
       - name: Upload native debug symbols
         if: always()
         uses: actions/upload-artifact@v4
@@ -124,7 +126,7 @@ jobs:
           path: build/app/intermediates/merged_native_libs/release/out/lib.symbols
           if-no-files-found: ignore
 
-      # 13. Upload build logs
+      # 15. Upload build logs
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
