@@ -1,4 +1,4 @@
-name: Flutter Build
+name: Flutter Build APK & AAB
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build APK & AAB
+    name: Build & Sign Flutter APK & AAB
     runs-on: ubuntu-latest
 
     env:
@@ -17,7 +17,7 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
-      # 1. Checkout repository
+      # 1. Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -38,26 +38,11 @@ jobs:
           channel: stable
           cache: true
 
-      # 4. Cache Flutter & Gradle dependencies
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.pub-cache
-            ~/.gradle/caches
-          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
-
-      # 5. Install dependencies & launcher icons
+      # 4. Install dependencies
       - name: Install dependencies
-        run: |
-          flutter pub get
-          flutter pub run flutter_launcher_icons:main || echo "No launcher icons configured"
+        run: flutter pub get
 
-      # 6. Verify Flutter version
-      - name: Verify Flutter version
-        run: flutter --version
-
-      # 7. Decode keystore & buat key.properties
+      # 5. Decode keystore & buat key.properties
       - name: Decode and secure keystore
         run: |
           mkdir -p android/app
@@ -66,73 +51,56 @@ jobs:
           echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=app/my-release-key.keystore" >> android/key.properties
+          echo "storeFile=my-release-key.keystore" >> android/key.properties
 
-      # 8. Update versionCode & versionName di build.gradle.kts
+      # 6. Update versionCode & versionName otomatis
       - name: Update versionCode & versionName
         run: |
-          FILE=android/app/build.gradle.kts
-          if [ -f "$FILE" ]; then
-            sed -i "s/versionCode [0-9]*/versionCode 85/" "$FILE"
-            sed -i "s/versionName \".*\"/versionName \"1.0.85\"/" "$FILE"
-            echo "✅ Updated versionCode=85 versionName=1.0.85"
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i "s/versionCode = [0-9]*/versionCode = ${{ github.run_number }}/" android/app/build.gradle.kts
+            sed -i "s/versionName = \".*\"/versionName = \"1.0.${{ github.run_number }}\"/" android/app/build.gradle.kts
+            echo "✅ Updated versionCode=${{ github.run_number }} versionName=1.0.${{ github.run_number }}"
           else
-            echo "❌ $FILE not found!"
+            echo "❌ android/app/build.gradle.kts not found!"
             exit 1
           fi
 
-      # 9. Build APK (release)
+      # 7. Print version info untuk debug
+      - name: Show version info
+        run: |
+          echo "=== Version Info (from build.gradle.kts) ==="
+          grep "versionCode" android/app/build.gradle.kts || true
+          grep "versionName" android/app/build.gradle.kts || true
+          echo "=========================================="
+
+      # 8. Build APK release
       - name: Build APK (release)
         run: |
-          set -e
           flutter clean
-          flutter build apk --release --verbose | tee flutter_build_apk.log
+          flutter build apk --release
 
-      # 10. Build AAB (release)
+      # 9. Build AAB release
       - name: Build AAB (release)
-        run: |
-          set -e
-          flutter build appbundle --release --verbose | tee flutter_build_aab.log
+        run: flutter build appbundle --release
 
-      # 11. List APK & AAB outputs
-      - name: List APK output
-        run: ls -R build/app/outputs/flutter-apk || echo "APK folder not found"
+      # 10. Debug list output
+      - name: List outputs
+        run: ls -R build/app/outputs || echo "⚠️ build outputs not found"
 
-      - name: List AAB output
-        run: ls -R build/app/outputs/bundle/release || echo "AAB folder not found"
-
-      # 12. Upload APK artifact
+      # 11. Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}.apk
-          path: build/app/outputs/flutter-apk/app-release*.apk
+          path: build/app/outputs/**/*.apk
+          if-no-files-found: error
           retention-days: 7
 
-      # 13. Upload AAB artifact
+      # 12. Upload AAB artifact
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}.aab
-          path: build/app/outputs/bundle/release/*.aab
+          path: build/app/outputs/**/*.aab
+          if-no-files-found: error
           retention-days: 7
-
-      # 14. Upload native debug symbols (jika ada)
-      - name: Upload native debug symbols
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lib-symbols-${{ github.run_number }}
-          path: build/app/intermediates/merged_native_libs/release/out/lib.symbols
-          if-no-files-found: ignore
-
-      # 15. Upload build logs
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs-${{ github.run_number }}
-          path: |
-            flutter_build_apk.log
-            flutter_build_aab.log
-          if-no-files-found: ignore
