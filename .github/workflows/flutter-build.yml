@@ -1,52 +1,61 @@
-name: Flutter Build
+name: Flutter Build APK & AAB
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build Flutter Release
     runs-on: ubuntu-latest
 
     env:
-      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-      FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable
-      PUB_CACHE: $HOME/.pub-cache
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Decode keystore
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
-
-      - name: Install Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.27.0"
 
-      - name: Flutter Pub Get
-        run: flutter pub get
+      - name: Decode Keystore
+        run: |
+          echo $ANDROID_KEYSTORE_BASE64 | base64 --decode > android/key.jks
 
-      - name: Clean Flutter
+      - name: Configure key.properties
+        run: |
+          cat <<EOF > android/key.properties
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=key.jks
+          EOF
+
+      - name: Flutter clean
         run: flutter clean
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
 
-      - name: Build AppBundle
+      - name: Build AAB
         run: flutter build appbundle --release
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload APK and AAB
+        uses: actions/upload-artifact@v4
         with:
-          name: android-build
+          name: flutter-build
           path: |
-            build/app/outputs/flutter-apk/*.apk
-            build/app/outputs/bundle/release/*.aab
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
