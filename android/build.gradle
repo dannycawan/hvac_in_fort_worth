@@ -1,14 +1,13 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
-
 buildscript {
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath "com.android.tools.build:gradle:8.1.0"
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0"
-        classpath "dev.flutter:gradle:3.27.0" // sesuaikan versi Flutter Gradle Plugin
+        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10"
+        // NOTE: Do NOT add Flutter plugin here. Flutter plugin is loaded in app/build.gradle
     }
 }
 
@@ -17,14 +16,6 @@ allprojects {
         google()
         mavenCentral()
     }
-}
-
-rootProject.buildDir = "../build"
-subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(":app")
 }
 
 task clean(type: Delete) {
