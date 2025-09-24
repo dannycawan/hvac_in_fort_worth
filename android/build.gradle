@@ -5,13 +5,10 @@ buildscript {
         google()
         mavenCentral()
     }
-
     dependencies {
         classpath "com.android.tools.build:gradle:8.1.0"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0"
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
+        classpath "dev.flutter:gradle:3.27.0" // sesuaikan versi Flutter Gradle Plugin
     }
 }
 
@@ -20,6 +17,14 @@ allprojects {
         google()
         mavenCentral()
     }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
 }
 
 task clean(type: Delete) {
