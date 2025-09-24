@@ -59,41 +59,51 @@ jobs:
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=my-release-key.keystore" >> android/key.properties
 
-      # 7. Build APK release
+      # 7. Auto update versionCode & versionName
+      - name: Update version in build.gradle
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \".*\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+          echo "Updated versionCode=${{ github.run_number }} versionName=1.0.${{ github.run_number }}"
+
+      # 8. Build APK release
       - name: Build APK (release)
         run: |
           flutter clean
           flutter build apk --release --verbose | tee flutter_build_apk.log
 
-      # 8. Build AAB release
+      # 9. Build AAB release
       - name: Build AAB (release)
         run: |
           flutter build appbundle --release --verbose | tee flutter_build_aab.log
 
-      # 9. List outputs
-      - name: List APK output
-        run: ls -R build/app/outputs/flutter-apk || echo "APK folder not found"
+      # 10. Debug list all outputs
+      - name: Debug list build outputs
+        run: |
+          echo "== APK files found =="
+          find build/app/outputs -name "*.apk" || echo "No APKs found"
+          echo "== AAB files found =="
+          find build/app/outputs -name "*.aab" || echo "No AABs found"
 
-      - name: List AAB output
-        run: ls -R build/app/outputs/bundle/release || echo "AAB folder not found"
-
-      # 10. Upload APK artifact
+      # 11. Upload APK artifact (semua APK)
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: warn
           retention-days: 7
 
-      # 11. Upload AAB artifact
+      # 12. Upload AAB artifact (semua AAB)
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: build/app/outputs/bundle/release/*.aab
+          if-no-files-found: warn
           retention-days: 7
 
-      # 12. Upload native debug symbols (jika ada)
+      # 13. Upload native debug symbols (jika ada)
       - name: Upload native debug symbols
         if: always()
         uses: actions/upload-artifact@v4
@@ -102,7 +112,7 @@ jobs:
           path: build/app/intermediates/merged_native_libs/release/out/lib.symbols
           if-no-files-found: ignore
 
-      # 13. Upload build logs
+      # 14. Upload build logs
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
