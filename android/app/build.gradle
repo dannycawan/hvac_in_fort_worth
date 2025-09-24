@@ -6,25 +6,25 @@ plugins {
 
 android {
     namespace 'com.hvac.fortworth'
-    compileSdkVersion 35
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.hvac.fortworth"
-        minSdkVersion 21
-        targetSdkVersion 35
+        minSdk 21
+        targetSdk 35
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.0"
 
         vectorDrawables.useSupportLibrary = true
     }
 
     signingConfigs {
-        def keystorePropertiesFile = rootProject.file("key.properties")
-        if (keystorePropertiesFile.exists()) {
-            def keystoreProperties = new Properties()
-            keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+        release {
+            def keystorePropertiesFile = rootProject.file("key.properties")
+            if (keystorePropertiesFile.exists()) {
+                def keystoreProperties = new Properties()
+                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 
-            release {
                 storeFile file(keystoreProperties["storeFile"])
                 storePassword keystoreProperties["storePassword"]
                 keyAlias keystoreProperties["keyAlias"]
@@ -35,7 +35,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig signingConfigs.release
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -57,10 +57,7 @@ android {
 
     packagingOptions {
         resources {
-            excludes += [
-                "META-INF/LICENSE*",
-                "META-INF/NOTICE*"
-            ]
+            excludes += ["META-INF/LICENSE*", "META-INF/NOTICE*"]
         }
     }
 }
