@@ -1,34 +1,38 @@
-name: Flutter Build Release
+name: Flutter Build APK & AAB
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     env:
+      FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.27.0-x64
+      PUB_CACHE: /home/runner/.pub-cache
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.27.0"
 
       - name: Decode keystore
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/my-new-release-key-new.jks
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/my-new-release-key.jks
+        shell: bash
 
-      - name: Install dependencies
+      - name: Ensure dependencies
         run: flutter pub get
 
       - name: Clean project
@@ -40,10 +44,14 @@ jobs:
       - name: Build AAB
         run: flutter build appbundle --release
 
-      - name: Upload artifacts
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-build
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
+          name: apk-release
+          path: build/app/outputs/flutter-apk/*.apk
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aab-release
+          path: build/app/outputs/bundle/release/*.aab
