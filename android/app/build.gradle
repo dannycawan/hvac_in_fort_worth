@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId "com.hvac.fortworth"
-        minSdk 21       // Bisa diturunkan ke 21 untuk kompatibilitas lebih luas
+        minSdk 21
         targetSdk 35
         versionCode 1
         versionName "1.0"

@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
@@ -25,17 +24,16 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.27.0"
+          flutter-version: 3.27.0
 
       - name: Decode keystore
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/my-new-release-key.jks
-        shell: bash
+          echo $ANDROID_KEYSTORE_BASE64 | base64 --decode > android/my-new-release-key-new.jks
 
-      - name: Ensure dependencies
+      - name: Get Flutter dependencies
         run: flutter pub get
 
-      - name: Clean project
+      - name: Clean previous builds
         run: flutter clean
 
       - name: Build APK
@@ -44,14 +42,14 @@ jobs:
       - name: Build AAB
         run: flutter build appbundle --release
 
-      - name: Upload APK artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apk-release
+          name: flutter-apk
           path: build/app/outputs/flutter-apk/*.apk
 
-      - name: Upload AAB artifact
+      - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aab-release
+          name: flutter-aab
           path: build/app/outputs/bundle/release/*.aab
