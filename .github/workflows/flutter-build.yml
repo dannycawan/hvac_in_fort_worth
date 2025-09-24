@@ -4,121 +4,78 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
-    name: Build APK & AAB
     runs-on: ubuntu-latest
 
-    env:
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-
     steps:
-      # 1. Checkout repo
+      # 1. Checkout kode repo
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       # 2. Setup Java (untuk Android build)
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: 17
 
       # 3. Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.0'
-          channel: stable
-          cache: true
+          flutter-version: '3.24.3' # pakai versi terbaru stabil
 
-      # 4. Install dependencies & launcher icons
+      # 4. Cache dependensi
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+            build
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-flutter-
+
+      # 5. Install dependencies
       - name: Install dependencies
-        run: |
-          flutter pub get
-          flutter pub run flutter_launcher_icons:main || echo "No launcher icons configured"
+        run: flutter pub get
 
-      # 5. Verify Flutter version
-      - name: Verify Flutter version
-        run: flutter --version
+      # 6. Clean build cache
+      - name: Flutter clean
+        run: flutter clean
 
-      # 6. Decode keystore & buat key.properties
-      - name: Decode and secure keystore
-        run: |
-          mkdir -p android/app
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/my-release-key.keystore
-          chmod 600 android/app/my-release-key.keystore
-          echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
-          echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=my-release-key.keystore" >> android/key.properties
-
-      # 7. Auto update versionCode & versionName
+      # 7. Update version (auto increment)
       - name: Update version in build.gradle
         run: |
-          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
-          sed -i "s/versionName \".*\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
-          echo "Updated versionCode=${{ github.run_number }} versionName=1.0.${{ github.run_number }}"
+          FILE="android/app/build.gradle"
+          if [ -f "$FILE" ]; then
+            sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" $FILE
+            sed -i "s/versionName \".*\"/versionName \"1.0.${{ github.run_number }}\"/" $FILE
+            echo "✅ Updated versionCode=${{ github.run_number }} versionName=1.0.${{ github.run_number }}"
+          else
+            echo "⚠️ $FILE not found, skipping version update"
+            ls -R .
+          fi
 
-      # 8. Build APK release
-      - name: Build APK (release)
-        run: |
-          flutter clean
-          flutter build apk --release --verbose | tee flutter_build_apk.log
+      # 8. Build APK
+      - name: Build APK
+        run: flutter build apk --release
 
-      # 9. Build AAB release
-      - name: Build AAB (release)
-        run: |
-          flutter build appbundle --release --verbose | tee flutter_build_aab.log
+      # 9. Build AAB (Play Store)
+      - name: Build AAB
+        run: flutter build appbundle --release
 
-      # 10. Debug list all outputs
-      - name: Debug list build outputs
-        run: |
-          echo "== APK files found =="
-          find build/app/outputs -name "*.apk" || echo "No APKs found"
-          echo "== AAB files found =="
-          find build/app/outputs -name "*.aab" || echo "No AABs found"
-
-      # 11. Upload APK artifact (semua APK)
-      - name: Upload APK artifact
+      # 10. Upload APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: warn
-          retention-days: 7
+          path: build/app/outputs/flutter-apk/app-release.apk
 
-      # 12. Upload AAB artifact (semua AAB)
-      - name: Upload AAB artifact
+      # 11. Upload AAB
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
-          path: build/app/outputs/bundle/release/*.aab
-          if-no-files-found: warn
-          retention-days: 7
-
-      # 13. Upload native debug symbols (jika ada)
-      - name: Upload native debug symbols
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lib-symbols-${{ github.run_number }}
-          path: build/app/intermediates/merged_native_libs/release/out/lib.symbols
-          if-no-files-found: ignore
-
-      # 14. Upload build logs
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs-${{ github.run_number }}
-          path: |
-            flutter_build_apk.log
-            flutter_build_aab.log
-          if-no-files-found: ignore
+          path: build/app/outputs/bundle/release/app-release.aab
