@@ -4,14 +4,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     env:
-      FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.27.0-x64
-      PUB_CACHE: /home/runner/.pub-cache
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -21,20 +20,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.27.0
+          flutter-version: "3.27.0"
+          channel: stable
 
-      - name: Decode keystore
+      - name: Decode Keystore
         run: |
-          echo $ANDROID_KEYSTORE_BASE64 | base64 --decode > android/my-new-release-key-new.jks
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/my-new-release-key-new.jks
 
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      - name: Clean previous builds
-        run: flutter clean
+      - name: Flutter clean & pub get
+        run: |
+          flutter clean
+          flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
@@ -42,14 +47,14 @@ jobs:
       - name: Build AAB
         run: flutter build appbundle --release
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: flutter-apk
+          name: app-release-apk
           path: build/app/outputs/flutter-apk/*.apk
 
-      - name: Upload AAB Artifact
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: flutter-aab
+          name: app-release-aab
           path: build/app/outputs/bundle/release/*.aab
