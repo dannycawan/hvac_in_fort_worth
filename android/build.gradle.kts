@@ -1,11 +1,9 @@
 plugins {
-    // Android Gradle Plugin
-    id("com.android.application") version "8.7.3" apply false
+    // Android Gradle Plugin → jangan lock version di sini
+    id("com.android.application") apply false
 
-    // Kotlin Android → jangan hardcode versi, biar pakai bawaan Flutter SDK
+    // Kotlin Android → pakai versi bawaan Flutter SDK
     id("org.jetbrains.kotlin.android") apply false
-
-    // Tidak pakai Firebase → google-services tidak perlu
 }
 
 allprojects {
@@ -15,14 +13,15 @@ allprojects {
     }
 }
 
-// Custom build dir biar lebih rapi
+// 📌 Opsional: Custom build dir (hapus kalau bikin error di CI/CD)
 val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
-    project.evaluationDependsOn(":app")
+    // Biasanya tidak perlu, hapus jika tidak ada dependency khusus
+    // project.evaluationDependsOn(":app")
 }
 
 tasks.register<Delete>("clean") {

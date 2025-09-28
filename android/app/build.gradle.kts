@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -8,7 +11,7 @@ plugins {
 android {
     namespace = "com.hvac.fortworth"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973" // pakai versi terbaru sesuai kebutuhan dependency
+    ndkVersion = "27.0.12077973" // opsional, sesuai kebutuhan dependency
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -26,15 +29,30 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        // opsional: agar tidak crash karena WebView di Android 11+
+        // Agar tidak crash karena WebView di Android 11+
         vectorDrawables.useSupportLibrary = true
+    }
+
+    // 🔑 Load key.properties
+    val keystorePropertiesFile: File = rootProject.file("android/key.properties")
+    val keystoreProperties = Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["keyPassword"] as String?
+            storeFile = keystoreProperties["storeFile"]?.let { file(it as String) }
+            storePassword = keystoreProperties["storePassword"] as String?
+        }
     }
 
     buildTypes {
         release {
-            // TODO: ganti dengan signingConfig release sebelum upload ke Play Store
-            signingConfig = signingConfigs.getByName("debug")
-            // sementara biar build cepat & stabil
+            // ✅ pakai keystore release (bukan debug)
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
@@ -43,7 +61,7 @@ android {
             )
         }
         debug {
-            // opsional, supaya debug lebih gampang
+            // hanya untuk development/testing
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
         }

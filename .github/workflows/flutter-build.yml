@@ -5,6 +5,7 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,6 +23,19 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # 🔑 Decode keystore dari GitHub Secrets
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/my-release-key.jks
+
+      # 🔑 Buat file key.properties otomatis
+      - name: Create key.properties
+        run: |
+          echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=my-release-key.jks" >> android/key.properties
+
       - name: Build APK (release)
         run: flutter build apk --release
 
@@ -32,14 +46,14 @@ jobs:
       - name: List build outputs
         run: ls -R build/app/outputs
 
-      # Upload APK sebagai artifact (pakai wildcard)
+      # Upload APK sebagai artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: hvac-apk
           path: build/app/outputs/flutter-apk/*.apk
 
-      # Upload AAB sebagai artifact (pakai wildcard)
+      # Upload AAB sebagai artifact
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
