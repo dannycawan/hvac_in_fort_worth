@@ -18,7 +18,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.27.0" # Versi Flutter yang stabil di runner
+          flutter-version: "3.27.0" # Versi Flutter stabil terbaru
 
       - name: Install dependencies
         run: flutter pub get
