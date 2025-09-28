@@ -11,7 +11,7 @@ plugins {
 android {
     namespace = "com.hvac.fortworth"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973" // opsional, sesuai kebutuhan dependency
+    ndkVersion = "27.0.12077973" // opsional
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -28,8 +28,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-
-        // Agar tidak crash karena WebView di Android 11+
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -46,8 +44,7 @@ android {
             keyPassword = keystoreProperties["keyPassword"]?.toString()
             val storeFilePath = keystoreProperties["storeFile"]?.toString()
             if (!storeFilePath.isNullOrEmpty()) {
-                // ✅ path selalu relatif terhadap root project
-                storeFile = rootProject.file("android/$storeFilePath")
+                storeFile = rootProject.file(storeFilePath) // ✅ langsung resolve dari root project
             }
             storePassword = keystoreProperties["storePassword"]?.toString()
         }
@@ -55,7 +52,6 @@ android {
 
     buildTypes {
         release {
-            // ✅ pakai keystore release (bukan debug)
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
@@ -65,7 +61,6 @@ android {
             )
         }
         debug {
-            // hanya untuk development/testing
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
         }
@@ -73,10 +68,7 @@ android {
 
     packaging {
         resources {
-            excludes += setOf(
-                "META-INF/LICENSE*",
-                "META-INF/NOTICE*"
-            )
+            excludes += setOf("META-INF/LICENSE*", "META-INF/NOTICE*")
         }
     }
 }
@@ -86,6 +78,5 @@ flutter {
 }
 
 dependencies {
-    // AdMob SDK
     implementation("com.google.android.gms:play-services-ads:23.1.0")
 }

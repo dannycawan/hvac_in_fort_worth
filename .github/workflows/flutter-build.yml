@@ -18,25 +18,24 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.27.0" # Versi Flutter stabil terbaru
+          flutter-version: "3.27.0"
 
       - name: Install dependencies
         run: flutter pub get
 
-      # 🔑 Decode keystore dari GitHub Secrets
+      # 🔑 Decode keystore
       - name: Decode keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/my-release-key.jks
 
-      # 🔑 Buat file key.properties otomatis
+      # 🔑 Create key.properties
       - name: Create key.properties
         run: |
           echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=../app/my-release-key.jks" >> android/key.properties
+          echo "storeFile=android/app/my-release-key.jks" >> android/key.properties
 
-      # 🔎 Debug untuk memastikan file keystore & key.properties ada
       - name: Debug keystore and key.properties
         run: |
           echo "---- android/app ----"
@@ -50,18 +49,15 @@ jobs:
       - name: Build AAB (release)
         run: flutter build appbundle --release
 
-      # Debug: cek isi folder output
       - name: List build outputs
         run: ls -R build/app/outputs
 
-      # 📦 Upload APK sebagai artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: hvac-apk
           path: build/app/outputs/flutter-apk/*.apk
 
-      # 📦 Upload AAB sebagai artifact
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
