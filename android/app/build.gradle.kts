@@ -29,7 +29,7 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
-    // 🔑 Load key.properties dari repo
+    // 🔑 Load key.properties
     val keystorePropertiesFile: File = rootProject.file("android/key.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
@@ -40,8 +40,8 @@ android {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"]?.toString()
             keyPassword = keystoreProperties["keyPassword"]?.toString()
-            storeFile = file("app/my-release-key.jks")
             storePassword = keystoreProperties["storePassword"]?.toString()
+            storeFile = file("my-release-key.jks") // ⬅️ perbaikan: relatif ke android/app
         }
     }
 
@@ -58,6 +58,12 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += setOf("META-INF/LICENSE*", "META-INF/NOTICE*")
         }
     }
 }

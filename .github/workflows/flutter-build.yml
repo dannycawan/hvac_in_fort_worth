@@ -12,25 +12,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 📥 Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ⚙️ Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.27.0" # versi Flutter stabil terbaru
+          flutter-version: "3.27.0"
 
-      # 🧹 Bersihkan build lama
-      - name: Clean Flutter build
-        run: flutter clean
-
-      # 📦 Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 🔑 Decode keystore dari GitHub Secrets (buat file .jks)
+      # 🔑 Decode keystore (buat file .jks)
       - name: Decode keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/my-release-key.jks
@@ -41,9 +34,8 @@ jobs:
           echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=app/my-release-key.jks" >> android/key.properties
+          echo "storeFile=my-release-key.jks" >> android/key.properties
 
-      # 🔎 Debug: cek apakah file keystore & key.properties sudah ada
       - name: Debug keystore and key.properties
         run: |
           echo "---- android/app ----"
@@ -51,26 +43,21 @@ jobs:
           echo "---- key.properties ----"
           cat android/key.properties
 
-      # 📱 Build APK (Release)
       - name: Build APK (release)
         run: flutter build apk --release
 
-      # 📦 Build AAB (Release, Play Store format)
       - name: Build AAB (release)
         run: flutter build appbundle --release
 
-      # 📂 Debug: list build outputs
       - name: List build outputs
         run: ls -R build/app/outputs
 
-      # ⬆️ Upload APK ke GitHub Actions artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: hvac-apk
           path: build/app/outputs/flutter-apk/*.apk
 
-      # ⬆️ Upload AAB ke GitHub Actions artifact
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
