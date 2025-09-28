@@ -36,6 +36,14 @@ jobs:
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=app/my-release-key.jks" >> android/key.properties
 
+      # 🔎 Debug untuk memastikan file keystore & key.properties ada
+      - name: Debug keystore and key.properties
+        run: |
+          echo "---- android/app ----"
+          ls -l android/app
+          echo "---- key.properties ----"
+          cat android/key.properties
+
       - name: Build APK (release)
         run: flutter build apk --release
 
