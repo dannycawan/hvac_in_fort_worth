@@ -22,11 +22,15 @@ jobs:
         with:
           flutter-version: "3.27.0" # versi Flutter stabil terbaru
 
+      # 🧹 Bersihkan build lama
+      - name: Clean Flutter build
+        run: flutter clean
+
       # 📦 Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 🔑 Decode keystore dari GitHub Secrets (buat file .jks di android/app)
+      # 🔑 Decode keystore dari GitHub Secrets (buat file .jks)
       - name: Decode keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/my-release-key.jks
