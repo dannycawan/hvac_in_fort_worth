@@ -42,5 +42,3 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# 🔑 Keystore & Signing (jangan sampai ke-push!)
-keystore-base64.txt
