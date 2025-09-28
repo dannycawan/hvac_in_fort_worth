@@ -54,14 +54,14 @@ jobs:
       - name: List build outputs
         run: ls -R build/app/outputs
 
-      # Upload APK sebagai artifact
+      # 📦 Upload APK sebagai artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: hvac-apk
           path: build/app/outputs/flutter-apk/*.apk
 
-      # Upload AAB sebagai artifact
+      # 📦 Upload AAB sebagai artifact
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:

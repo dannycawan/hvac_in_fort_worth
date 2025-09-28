@@ -44,7 +44,11 @@ android {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"]?.toString()
             keyPassword = keystoreProperties["keyPassword"]?.toString()
-            storeFile = keystoreProperties["storeFile"]?.toString()?.let { file(it) }
+            val storeFilePath = keystoreProperties["storeFile"]?.toString()
+            if (!storeFilePath.isNullOrEmpty()) {
+                // ✅ path selalu relatif terhadap root project
+                storeFile = rootProject.file("android/$storeFilePath")
+            }
             storePassword = keystoreProperties["storePassword"]?.toString()
         }
     }
