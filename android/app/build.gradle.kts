@@ -35,7 +35,10 @@ android {
     val keystorePropertiesFile: File = rootProject.file("android/key.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
+        println("✅ key.properties ditemukan: ${keystorePropertiesFile.absolutePath}")
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    } else {
+        println("⚠️ WARNING: key.properties tidak ditemukan!")
     }
 
     signingConfigs {
@@ -44,7 +47,10 @@ android {
             keyPassword = keystoreProperties["keyPassword"]?.toString()
             val storeFilePath = keystoreProperties["storeFile"]?.toString()
             if (!storeFilePath.isNullOrEmpty()) {
-                storeFile = rootProject.file(storeFilePath) // ✅ langsung resolve dari root project
+                println("✅ Menggunakan storeFile path: $storeFilePath")
+                storeFile = file(storeFilePath) // relatif ke root project
+            } else {
+                println("⚠️ ERROR: storeFile tidak ada di key.properties")
             }
             storePassword = keystoreProperties["storePassword"]?.toString()
         }
