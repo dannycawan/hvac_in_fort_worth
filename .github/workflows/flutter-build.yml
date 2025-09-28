@@ -37,7 +37,7 @@ jobs:
           echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=my-release-key.jks" >> android/key.properties
+          echo "storeFile=android/app/my-release-key.jks" >> android/key.properties
 
       # 🔎 Debug: cek apakah file keystore & key.properties sudah ada
       - name: Debug keystore and key.properties
