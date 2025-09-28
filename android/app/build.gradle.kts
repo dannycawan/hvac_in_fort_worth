@@ -4,13 +4,12 @@ import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // Flutter Gradle Plugin harus terakhir
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.hvac.fortworth"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = flutter.compileSdkVersion.toInt()
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -23,42 +22,43 @@ android {
 
     defaultConfig {
         applicationId = "com.hvac.fortworth"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
+        minSdk = flutter.minSdkVersion.toInt()
+        targetSdk = flutter.targetSdkVersion.toInt()
+        versionCode = flutter.versionCode.toInt()
         versionName = flutter.versionName
         vectorDrawables.useSupportLibrary = true
     }
 
-    // 🔑 Load key.properties (langsung di folder android/)
-    val keystorePropertiesFile: File = rootProject.file("key.properties")
+    // 🔑 Load key.properties dengan error handling yang lebih baik
     val keystoreProperties = Properties()
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    
     if (keystorePropertiesFile.exists()) {
         println("✅ key.properties ditemukan: ${keystorePropertiesFile.absolutePath}")
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     } else {
-        println("⚠️ WARNING: key.properties tidak ditemukan!")
+        println("⚠️ WARNING: key.properties tidak ditemukan! Build akan menggunakan debug signing")
     }
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"]?.toString()
-            keyPassword = keystoreProperties["keyPassword"]?.toString()
-            storePassword = keystoreProperties["storePassword"]?.toString()
-
-            val storeFilePath = keystoreProperties["storeFile"]?.toString()
-            if (!storeFilePath.isNullOrEmpty()) {
-                storeFile = file(storeFilePath)
-                println("✅ Menggunakan keystore: $storeFilePath")
-            } else {
-                println("⚠️ ERROR: storeFile tidak ada di key.properties")
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
     }
 
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("release")
+        getByName("release") {
+            // Gunakan release signing jika keystore ada,否则 gunakan debug
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
@@ -66,15 +66,20 @@ android {
                 "proguard-rules.pro"
             )
         }
-        debug {
+        getByName("debug") {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            versionNameSuffix = "-DEBUG"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
     packaging {
         resources {
-            excludes += setOf("META-INF/LICENSE*", "META-INF/NOTICE*")
+            excludes += setOf(
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "**/lib/**/libapp.so"
+            )
         }
     }
 }
@@ -85,4 +90,6 @@ flutter {
 
 dependencies {
     implementation("com.google.android.gms:play-services-ads:23.1.0")
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
 }

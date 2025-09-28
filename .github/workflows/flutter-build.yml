@@ -20,44 +20,132 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.27.0" # versi Flutter stabil terbaru
+          flutter-version: "3.27.0"
+          cache: true
+          cache-key: flutter-packages
 
       # 📦 Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 🔎 Debug: cek apakah file keystore & key.properties ada
+      # 🔑 Setup Keystore (DIPERBAIKI - menggunakan secret names yang benar)
+      - name: Setup Keystore
+        run: |
+          echo "Membuat keystore dari GitHub Secrets..."
+          echo "${{ secrets.ANDROID_KEYSTORE_FILE }}" | base64 -d > android/app/my-release-key.jks
+          
+          echo "Membuat key.properties..."
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=my-release-key.jks
+          EOF
+
+      # 🔎 Debug: cek apakah file keystore & key.properties ada (DIPERBAIKI)
       - name: Debug keystore and key.properties
         run: |
+          echo "=== DEBUG KEYSTORE SETUP ==="
+          echo "---- Struktur folder android ----"
+          find android -name "*.jks" -o -name "*.properties" | head -10
+          
           echo "---- android/app ----"
-          ls -l android/app
-          echo "---- android ----"
-          ls -l android
-          echo "---- key.properties ----"
-          cat android/key.properties || echo "⚠️ key.properties tidak ditemukan!"
+          ls -la android/app/ | grep -E "(jks|keystore)" || echo "Tidak ada file keystore"
+          
+          echo "---- android/key.properties ----"
+          if [ -f "android/key.properties" ]; then
+            echo "✅ key.properties ditemukan:"
+            cat android/key.properties
+          else
+            echo "❌ key.properties TIDAK ditemukan!"
+          fi
+          
+          echo "---- Verifikasi keystore ----"
+          if [ -f "android/app/my-release-key.jks" ]; then
+            keytool -list -v -keystore android/app/my-release-key.jks -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" || echo "⚠️ Gagal verifikasi keystore"
+          else
+            echo "❌ File keystore tidak ditemukan!"
+          fi
 
-      # 📱 Build APK (Release)
+      # 🔧 Fix permissions (DIPERBAIKI)
+      - name: Fix permissions
+        run: |
+          sudo chmod -R 755 android
+          sudo chmod 644 android/app/my-release-key.jks
+          echo "✅ Permissions fixed"
+
+      # 🔍 Flutter doctor (TAMBAHAN - untuk troubleshooting)
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      # 🏗️ Build APK (Release) (DIPERBAIKI - dengan error handling)
       - name: Build APK (release)
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release --verbose
+        timeout-minutes: 15
 
-      # 📦 Build AAB (Release, Play Store format)
+      # 🏗️ Build AAB (Release) (DIPERBAIKI - dengan error handling)
       - name: Build AAB (release)
-        run: flutter build appbundle --release
+        run: |
+          flutter build appbundle --release --verbose
+        timeout-minutes: 15
 
-      # 📂 Debug: list build outputs
+      # 📂 Debug: list build outputs (DIPERBAIKI)
       - name: List build outputs
-        run: ls -R build/app/outputs
+        run: |
+          echo "=== BUILD OUTPUTS ==="
+          echo "---- Struktur build folder ----"
+          find build/ -type f -name "*.apk" -o -name "*.aab" | head -20
+          
+          echo "---- Detail APK files ----"
+          if [ -d "build/app/outputs/flutter-apk" ]; then
+            ls -la build/app/outputs/flutter-apk/
+            echo "📱 APK files:"
+            find build/app/outputs/flutter-apk -name "*.apk"
+          else
+            echo "❌ Folder APK tidak ditemukan"
+          fi
+          
+          echo "---- Detail AAB files ----"
+          if [ -d "build/app/outputs/bundle" ]; then
+            ls -la build/app/outputs/bundle/
+            echo "📦 AAB files:"
+            find build/app/outputs/bundle -name "*.aab"
+          else
+            echo "❌ Folder AAB tidak ditemukan"
+          fi
 
-      # ⬆️ Upload APK ke GitHub Actions artifact
+      # ⬆️ Upload APK ke GitHub Actions artifact (DIPERBAIKI)
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: hvac-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          name: hvac-apk-release
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-release-*.apk
+          if-no-files-found: warn
+          retention-days: 7
 
-      # ⬆️ Upload AAB ke GitHub Actions artifact
+      # ⬆️ Upload AAB ke GitHub Actions artifact (DIPERBAIKI)
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: hvac-aab
-          path: build/app/outputs/bundle/release/*.aab
+          name: hvac-aab-release
+          path: |
+            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/bundle/release/app-*.aab
+          if-no-files-found: warn
+          retention-days: 7
+
+      # 🔍 Build info (DIPERBAIKI)
+      - name: Build info
+        if: success()
+        run: |
+          echo "🎉 BUILD BERHASIL!"
+          echo "=================="
+          echo "📱 APK Files:"
+          find build/app/outputs/flutter-apk -name "*.apk" 2>/dev/null || echo "Tidak ada APK"
+          echo "📦 AAB Files:"
+          find build/app/outputs/bundle -name "*.aab" 2>/dev/null || echo "Tidak ada AAB"
+          echo "=================="
+          echo "⏰ Waktu: $(date)"

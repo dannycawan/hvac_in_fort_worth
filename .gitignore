@@ -42,3 +42,35 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android Keystore files (TAMBAHAN BARU)
+*.jks
+*.keystore
+*.key
+android/key.properties
+
+# Android build files
+/android/app/.gradle
+/android/.gradle
+/android/build
+/android/local.properties
+
+# iOS build files
+/ios/.generated
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+
+# Flutter coverage
+/coverage/
+
+# Firebase
+**/firebase-debug.log
+**/firebase-export.json
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment files
+.env
+.env.local
+.env.production
