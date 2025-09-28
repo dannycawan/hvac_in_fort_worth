@@ -4,7 +4,8 @@ import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    id("dev.flutter.flutter-gradle-plugin") // Flutter plugin harus terakhir
+    // Flutter Gradle Plugin harus terakhir
+    id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
@@ -29,8 +30,8 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
-    // 🔑 Load key.properties
-    val keystorePropertiesFile: File = rootProject.file("android/key.properties")
+    // 🔑 Load key.properties (langsung di folder android/)
+    val keystorePropertiesFile: File = rootProject.file("key.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
         println("✅ key.properties ditemukan: ${keystorePropertiesFile.absolutePath}")
@@ -43,8 +44,15 @@ android {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"]?.toString()
             keyPassword = keystoreProperties["keyPassword"]?.toString()
-            storeFile = keystoreProperties["storeFile"]?.toString()?.let { file(it) }
             storePassword = keystoreProperties["storePassword"]?.toString()
+
+            val storeFilePath = keystoreProperties["storeFile"]?.toString()
+            if (!storeFilePath.isNullOrEmpty()) {
+                storeFile = file(storeFilePath)
+                println("✅ Menggunakan keystore: $storeFilePath")
+            } else {
+                println("⚠️ ERROR: storeFile tidak ada di key.properties")
+            }
         }
     }
 
