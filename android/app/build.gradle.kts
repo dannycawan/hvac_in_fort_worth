@@ -33,15 +33,18 @@ android {
     val keystorePropertiesFile: File = rootProject.file("android/key.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
+        println("✅ key.properties ditemukan: ${keystorePropertiesFile.absolutePath}")
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    } else {
+        println("⚠️ WARNING: key.properties tidak ditemukan!")
     }
 
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"]?.toString()
             keyPassword = keystoreProperties["keyPassword"]?.toString()
+            storeFile = keystoreProperties["storeFile"]?.toString()?.let { file(it) }
             storePassword = keystoreProperties["storePassword"]?.toString()
-            storeFile = file("my-release-key.jks") // ⬅️ perbaikan: relatif ke android/app
         }
     }
 
