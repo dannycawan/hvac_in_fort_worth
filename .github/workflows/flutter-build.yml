@@ -72,3 +72,4 @@ jobs:
         with:
           name: hvac-aab
           path: build/app/outputs/bundle/release/*.aab
+
